@@ -1,0 +1,45 @@
+import { Container } from "@/components/container";
+import { useAuth } from "@/lib/auth-client";
+import { Redirect } from "expo-router";
+{{#if (includes examples "todo")}}
+import { api } from "{{#if (eq api "trpc")}}@/utils/trpc{{else if (eq api "orpc")}}@/utils/orpc{{/if}}";
+{{/if}}
+import { Text, View } from "react-native";
+
+export default function HomeScreen() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <Container>
+        <View className="flex items-center justify-center">
+          <Text className="text-muted-foreground">Loading...</Text>
+        </View>
+      </Container>
+    );
+  }
+
+  if (!user) {
+    return <Redirect href="/sign-in" />;
+  }
+
+  {{#if (includes examples "todo")}}
+  const utils = api.useContext();
+  const todos = api.todo.all.useQuery();
+  {{/if}}
+
+  return (
+    <Container>
+      <View className="items-center justify-center p-4">
+        <Text className="text-5xl font-bold mb-6">👋</Text>
+        <Text className="text-2xl font-bold mb-6">Welcome to {{projectName}}!</Text>
+        
+        <View className="bg-secondary p-4 rounded-lg mb-6">
+          <Text className="text-secondary-foreground text-center">
+            You are signed in as {user.email}
+          </Text>
+        </View>
+      </View>
+    </Container>
+  );
+}

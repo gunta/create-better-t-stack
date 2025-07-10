@@ -14,7 +14,7 @@ export const DEFAULT_CONFIG: ProjectConfig = {
 	frontend: ["tanstack-router"],
 	database: "sqlite",
 	orm: "drizzle",
-	auth: true,
+	auth: "better-auth",
 	addons: ["turborepo"],
 	examples: [],
 	git: true,
@@ -30,6 +30,13 @@ export const DEFAULT_CONFIG: ProjectConfig = {
 export const dependencyVersionMap = {
 	"better-auth": "^1.2.10",
 	"@better-auth/expo": "^1.2.10",
+
+	"@clerk/nextjs": "^6.14.0",
+	"@clerk/themes": "^2.2.4",
+	"@clerk/backend": "^2.23.0",
+	"@clerk/clerk-expo": "^3.1.2",
+	"@clerk/clerk-react": "^5.22.0",
+	"@clerk/convex": "^0.0.24",
 
 	"drizzle-orm": "^0.44.2",
 	"drizzle-kit": "^0.31.2",
@@ -80,12 +87,23 @@ export const dependencyVersionMap = {
 	"@fastify/cors": "^11.0.1",
 
 	turbo: "^2.5.4",
+	"@moonrepo/cli": "^1.30.5",
+
+	mintlify: "^4.0.0",
 
 	ai: "^4.3.16",
 	"@ai-sdk/google": "^1.2.3",
 	"@ai-sdk/vue": "^1.2.8",
 	"@ai-sdk/svelte": "^2.1.9",
 	"@ai-sdk/react": "^1.2.12",
+	"@ai-sdk/openai": "^1.3.22",
+
+	"@mastra/core": "latest",
+	"@mastra/memory": "latest",
+	"@mastra/libsql": "latest",
+	mastra: "latest",
+	mathjs: "^13.2.3",
+	zod: "^3.25.67",
 
 	"@prisma/extension-accelerate": "^1.3.0",
 
@@ -100,6 +118,7 @@ export const dependencyVersionMap = {
 	convex: "^1.25.0",
 	"@convex-dev/react-query": "^0.0.0-alpha.8",
 	"convex-svelte": "^0.0.11",
+	"@convex-dev/auth": "^0.0.86",
 
 	"@tanstack/svelte-query": "^5.74.4",
 	"@tanstack/react-query-devtools": "^5.80.5",
@@ -113,6 +132,10 @@ export const dependencyVersionMap = {
 	"@opennextjs/cloudflare": "^1.3.0",
 	"nitro-cloudflare-dev": "^0.2.2",
 	"@sveltejs/adapter-cloudflare": "^7.0.4",
+
+	stripe: "^17.6.0",
+	"@stripe/stripe-js": "^5.4.0",
+	"@stripe/react-stripe-js": "^3.1.2",
 } as const;
 
 export type AvailableDependencies = keyof typeof dependencyVersionMap;
@@ -123,7 +146,9 @@ export const ADDON_COMPATIBILITY = {
 	biome: [],
 	husky: [],
 	turborepo: [],
+	moonrepo: [],
 	starlight: [],
+	mintlify: [],
 	none: [],
 } as const;
 

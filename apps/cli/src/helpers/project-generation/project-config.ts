@@ -37,6 +37,8 @@ async function updateRootPackageJson(
 	let serverDevScript = "";
 	if (options.addons.includes("turborepo")) {
 		serverDevScript = `turbo -F ${backendPackageName} dev`;
+	} else if (options.addons.includes("moonrepo")) {
+		serverDevScript = `moon run ${backendPackageName}:dev`;
 	} else if (options.packageManager === "bun") {
 		serverDevScript = `bun run --filter ${backendPackageName} dev`;
 	} else if (options.packageManager === "pnpm") {
@@ -85,6 +87,33 @@ async function updateRootPackageJson(
 			scripts["db:watch"] = `turbo -F ${backendPackageName} db:watch`;
 			scripts["db:stop"] = `turbo -F ${backendPackageName} db:stop`;
 			scripts["db:down"] = `turbo -F ${backendPackageName} db:down`;
+		}
+	} else if (options.addons.includes("moonrepo")) {
+		scripts.dev = "moon run :dev";
+		scripts.build = "moon run :build";
+		scripts["check-types"] = "moon run :check-types";
+		scripts["dev:native"] = "moon run native:dev";
+		scripts["dev:web"] = "moon run web:dev";
+		scripts["dev:server"] = serverDevScript;
+		if (options.backend === "convex") {
+			scripts["dev:setup"] = `moon run ${backendPackageName}:dev:setup`;
+		}
+		if (needsDbScripts) {
+			scripts["db:push"] = `moon run ${backendPackageName}:db:push`;
+			scripts["db:studio"] = `moon run ${backendPackageName}:db:studio`;
+			if (options.orm === "prisma") {
+				scripts["db:generate"] = `moon run ${backendPackageName}:db:generate`;
+				scripts["db:migrate"] = `moon run ${backendPackageName}:db:migrate`;
+			} else if (options.orm === "drizzle") {
+				scripts["db:generate"] = `moon run ${backendPackageName}:db:generate`;
+				scripts["db:migrate"] = `moon run ${backendPackageName}:db:migrate`;
+			}
+		}
+		if (options.dbSetup === "docker") {
+			scripts["db:start"] = `moon run ${backendPackageName}:db:start`;
+			scripts["db:watch"] = `moon run ${backendPackageName}:db:watch`;
+			scripts["db:stop"] = `moon run ${backendPackageName}:db:stop`;
+			scripts["db:down"] = `moon run ${backendPackageName}:db:down`;
 		}
 	} else if (options.packageManager === "pnpm") {
 		scripts.dev = devScript;

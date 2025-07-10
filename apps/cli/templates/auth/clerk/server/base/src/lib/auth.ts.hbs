@@ -1,0 +1,54 @@
+import { clerkMiddleware, getAuth } from "@clerk/backend";
+import type { Context } from "hono";
+
+{{#if (eq backend "express")}}
+import { ClerkExpressRequireAuth } from "@clerk/clerk-sdk-node";
+
+export const requireAuth = ClerkExpressRequireAuth();
+{{/if}}
+
+{{#if (eq backend "hono")}}
+export const clerkAuth = clerkMiddleware({
+  publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
+  secretKey: process.env.CLERK_SECRET_KEY,
+});
+
+export const requireAuth = async (c: Context, next: Function) => {
+  const auth = getAuth(c.req);
+  
+  if (!auth?.userId) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+  
+  c.set("auth", auth);
+  await next();
+};
+{{/if}}
+
+{{#if (eq backend "fastify")}}
+import { clerkPlugin } from "@clerk/fastify";
+
+export const clerkConfig = {
+  publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
+  secretKey: process.env.CLERK_SECRET_KEY,
+};
+
+export { clerkPlugin };
+{{/if}}
+
+{{#if (eq backend "elysia")}}
+export const clerkConfig = {
+  publishableKey: process.env.CLERK_PUBLISHABLE_KEY!,
+  secretKey: process.env.CLERK_SECRET_KEY!,
+};
+
+export const requireAuth = async (request: Request) => {
+  const auth = await getAuth(request);
+  
+  if (!auth?.userId) {
+    throw new Error("Unauthorized");
+  }
+  
+  return auth;
+};
+{{/if}}

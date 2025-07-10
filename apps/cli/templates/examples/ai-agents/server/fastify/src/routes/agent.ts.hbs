@@ -1,0 +1,54 @@
+import { FastifyInstance } from "fastify";
+import { mastra } from "../mastra";
+import { RuntimeContext } from "@mastra/core/di";
+
+export default async function agentRoutes(fastify: FastifyInstance) {
+  fastify.post("/api/agent", async (request, reply) => {
+    const { messages, resourceId, threadId } = request.body as any;
+    
+    const agent = mastra.getAgent("assistantAgent");
+    
+    // Set up runtime context if needed
+    const runtimeContext = new RuntimeContext();
+    
+    // Use memory if resourceId and threadId are provided
+    const options = {
+      runtimeContext,
+      ...(resourceId && threadId && { resourceId, threadId }),
+    };
+    
+    const result = await agent.stream(messages, options);
+    
+    reply.raw.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive",
+    });
+    
+    for await (const chunk of result.textStream) {
+      reply.raw.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+    }
+    
+    reply.raw.end();
+  });
+
+  fastify.post("/api/workflow", async (request, reply) => {
+    const { topic } = request.body as any;
+    
+    if (!topic) {
+      return reply.code(400).send({ error: "Topic is required" });
+    }
+    
+    try {
+      const workflow = mastra.getWorkflow("researchWorkflow");
+      const result = await workflow.execute({
+        inputData: { topic },
+      });
+      
+      return reply.send(result);
+    } catch (error) {
+      console.error("Workflow error:", error);
+      return reply.code(500).send({ error: "Failed to execute workflow" });
+    }
+  });
+}

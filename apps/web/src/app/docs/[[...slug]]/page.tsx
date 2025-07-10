@@ -1,3 +1,4 @@
+import { source } from "@/lib/source";
 import Features from "components/features";
 import defaultMdxComponents from "fumadocs-ui/mdx";
 import {
@@ -7,7 +8,6 @@ import {
 	DocsTitle,
 } from "fumadocs-ui/page";
 import { notFound } from "next/navigation";
-import { source } from "@/lib/source";
 
 export default async function Page(props: {
 	params: Promise<{ slug?: string[] }>;

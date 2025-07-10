@@ -90,9 +90,11 @@
           "pwa",
           "tauri",
           "starlight",
+          "mintlify",
           "biome",
           "husky",
           "turborepo",
+          "moonrepo",
           "none"
         ]
       },

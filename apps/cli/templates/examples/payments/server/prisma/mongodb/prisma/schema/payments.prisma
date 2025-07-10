@@ -1,0 +1,100 @@
+model Customer {
+  id              String           @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String           @unique
+  stripeCustomerId String?         @unique
+  email           String
+  name            String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  
+  subscriptionIds String[]         @db.ObjectId
+  invoiceIds      String[]         @db.ObjectId
+  paymentIntentIds String[]        @db.ObjectId
+
+  @@map("customers")
+}
+
+model Product {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  stripeProductId String?  @unique
+  name            String
+  description     String?
+  features        String[]
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  priceIds        String[] @db.ObjectId
+
+  @@map("products")
+}
+
+model Price {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  productId     String   @db.ObjectId
+  stripePriceId String?  @unique
+  unitAmount    Int
+  currency      String   @default("usd")
+  type          String   @default("one_time") // one_time or recurring
+  interval      String?  // month, year, week, day
+  intervalCount Int?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("prices")
+}
+
+model Subscription {
+  id                   String    @id @default(auto()) @map("_id") @db.ObjectId
+  customerId           String    @db.ObjectId
+  stripeSubscriptionId String?   @unique
+  status               String    // active, canceled, incomplete, incomplete_expired, trialing, past_due, unpaid
+  priceId              String?   @db.ObjectId
+  quantity             Int       @default(1)
+  cancelAtPeriodEnd    Boolean   @default(false)
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  endedAt              DateTime?
+  cancelAt             DateTime?
+  canceledAt           DateTime?
+  trialStart           DateTime?
+  trialEnd             DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@map("subscriptions")
+}
+
+model Invoice {
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  customerId       String    @db.ObjectId
+  subscriptionId   String?   @db.ObjectId
+  stripeInvoiceId  String?   @unique
+  number           String?
+  amountPaid       Int
+  amountDue        Int
+  currency         String
+  status           String    // draft, open, paid, uncollectible, void
+  hostedInvoiceUrl String?
+  pdfUrl           String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@map("invoices")
+}
+
+model PaymentIntent {
+  id                    String   @id @default(auto()) @map("_id") @db.ObjectId
+  customerId            String   @db.ObjectId
+  stripePaymentIntentId String?  @unique
+  amount                Int
+  currency              String
+  status                String   // succeeded, processing, requires_payment_method, requires_confirmation, requires_action, canceled, requires_capture
+  description           String?
+  metadata              Json?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("payment_intents")
+}

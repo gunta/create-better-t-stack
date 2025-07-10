@@ -7,25 +7,28 @@
 	},
 	"files": {
 		"ignoreUnknown": false,
-		"includes": [
-			"**",
-			"!**/.next",
-			"!**/dist",
-			"!**/.source",
-			"!**/out",
-			"!**/templates/**",
-			"!**/.turbo",
-			"!**/package.json",
-			"!**/analytics-data.json",
-			"!**/schema.json"
+		"include": ["**"],
+		"ignore": [
+			"**/.next/**",
+			"**/dist/**",
+			"**/.source/**",
+			"**/out/**",
+			"**/templates/**",
+			"**/.turbo/**",
+			"**/package.json",
+			"**/analytics-data.json",
+			"**/schema.json"
 		]
 	},
 	"formatter": {
 		"enabled": true,
 		"indentStyle": "tab",
-		"includes": ["**", "!**/templates"]
+		"include": ["**"],
+		"ignore": ["**/templates/**"]
 	},
-	"assist": { "actions": { "source": { "organizeImports": "on" } } },
+	"organizeImports": {
+		"enabled": true
+	},
 	"linter": {
 		"enabled": true,
 		"rules": {
@@ -57,7 +60,8 @@
 				"noUselessElse": "error"
 			}
 		},
-		"includes": ["**", "!**/template"]
+		"include": ["**"],
+		"ignore": ["**/templates/**"]
 	},
 	"javascript": {
 		"formatter": {

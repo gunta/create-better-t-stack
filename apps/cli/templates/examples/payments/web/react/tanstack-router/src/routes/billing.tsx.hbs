@@ -1,0 +1,240 @@
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, CreditCard, ExternalLink } from "lucide-react";
+import { createFileRoute } from "@tanstack/react-router";
+{{#if (eq api "orpc")}}
+import { orpc } from "@/utils/orpc";
+{{/if}}
+{{#if (eq api "trpc")}}
+import { trpc } from "@/utils/trpc";
+{{/if}}
+import { useMutation, useQuery } from "@tanstack/react-query";
+{{#if (eq auth "better-auth")}}
+import { authClient } from "@/utils/auth";
+{{/if}}
+{{#if (eq auth "clerk")}}
+import { useAuth } from "@clerk/nextjs";
+{{/if}}
+
+export const Route = createFileRoute("/billing")({
+  component: BillingRoute,
+});
+
+function BillingRoute() {
+  {{#if (eq auth "better-auth")}}
+  const { data: session } = useQuery({
+    queryKey: ["session"],
+    queryFn: () => authClient.getSession(),
+  });
+  {{/if}}
+  {{#if (eq auth "clerk")}}
+  const { isSignedIn } = useAuth();
+  {{/if}}
+  
+  {{#if (eq api "orpc")}}
+  const customer = useQuery(orpc.payments.getCustomer.queryOptions());
+  const subscriptions = useQuery(orpc.payments.getSubscriptions.queryOptions());
+  
+  const portalMutation = useMutation(
+    orpc.payments.createPortalSession.mutationOptions({
+      onSuccess: (data) => {
+        if (data.url) {
+          window.location.href = data.url;
+        }
+      },
+    })
+  );
+  
+  const cancelMutation = useMutation(
+    orpc.payments.cancelSubscription.mutationOptions({
+      onSuccess: () => {
+        subscriptions.refetch();
+      },
+    })
+  );
+  {{/if}}
+  {{#if (eq api "trpc")}}
+  const customer = useQuery(trpc.payments.getCustomer.queryOptions());
+  const subscriptions = useQuery(trpc.payments.getSubscriptions.queryOptions());
+  
+  const portalMutation = useMutation(
+    trpc.payments.createPortalSession.mutationOptions({
+      onSuccess: (data) => {
+        if (data.url) {
+          window.location.href = data.url;
+        }
+      },
+    })
+  );
+  
+  const cancelMutation = useMutation(
+    trpc.payments.cancelSubscription.mutationOptions({
+      onSuccess: () => {
+        subscriptions.refetch();
+      },
+    })
+  );
+  {{/if}}
+
+  const handleOpenPortal = () => {
+    const returnUrl = window.location.href;
+    portalMutation.mutate({ returnUrl });
+  };
+
+  const handleCancelSubscription = (subscriptionId: string) => {
+    if (confirm("Are you sure you want to cancel this subscription?")) {
+      cancelMutation.mutate({ subscriptionId });
+    }
+  };
+
+  {{#if (eq auth "better-auth")}}
+  if (!session) {
+  {{/if}}
+  {{#if (eq auth "clerk")}}
+  if (!isSignedIn) {
+  {{/if}}
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-16 text-center">
+        <p>Please sign in to view your billing information.</p>
+      </div>
+    );
+  }
+
+  if (customer.isLoading || subscriptions.isLoading) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-4xl px-4 py-16">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold">Billing & Subscriptions</h1>
+        <p className="mt-2 text-muted-foreground">
+          Manage your payment methods and subscriptions
+        </p>
+      </div>
+
+      {/* Customer Info */}
+      {customer.data && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Account Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div>
+                <span className="font-medium">Email:</span> {customer.data.email}
+              </div>
+              {customer.data.name && (
+                <div>
+                  <span className="font-medium">Name:</span> {customer.data.name}
+                </div>
+              )}
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button
+              onClick={handleOpenPortal}
+              disabled={portalMutation.isPending}
+              variant="outline"
+            >
+              {portalMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <CreditCard className="mr-2 h-4 w-4" />
+              )}
+              Manage Payment Methods
+              <ExternalLink className="ml-2 h-3 w-3" />
+            </Button>
+          </CardFooter>
+        </Card>
+      )}
+
+      {/* Active Subscriptions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Active Subscriptions</CardTitle>
+          <CardDescription>
+            Your current subscriptions and their status
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {subscriptions.data?.length === 0 ? (
+            <p className="text-muted-foreground">
+              You don't have any active subscriptions.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {subscriptions.data?.map((subscription) => (
+                <div
+                  key={subscription.id}
+                  className="flex items-center justify-between rounded-lg border p-4"
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium">
+                        {subscription.price?.product?.name || "Subscription"}
+                      </h3>
+                      <Badge
+                        variant={
+                          subscription.status === "active"
+                            ? "default"
+                            : subscription.status === "canceled"
+                            ? "destructive"
+                            : "secondary"
+                        }
+                      >
+                        {subscription.status}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {subscription.price && (
+                        <span>
+                          ${(subscription.price.unitAmount / 100).toFixed(2)} / {subscription.price.interval}
+                        </span>
+                      )}
+                    </p>
+                    {subscription.currentPeriodEnd && (
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {subscription.cancelAtPeriodEnd
+                          ? `Cancels on ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}`
+                          : `Renews on ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}`}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    {subscription.status === "active" && !subscription.cancelAtPeriodEnd && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleCancelSubscription(subscription.id)}
+                        disabled={cancelMutation.isPending}
+                      >
+                        {cancelMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          "Cancel"
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

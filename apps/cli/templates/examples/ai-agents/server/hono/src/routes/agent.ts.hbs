@@ -1,0 +1,53 @@
+import { Hono } from "hono";
+import { mastra } from "../mastra";
+import { RuntimeContext } from "@mastra/core/di";
+import { streamSSE } from "hono/streaming";
+
+const app = new Hono();
+
+app.post("/api/agent", async (c) => {
+  const { messages, resourceId, threadId } = await c.req.json();
+  
+  const agent = mastra.getAgent("assistantAgent");
+  
+  // Set up runtime context if needed
+  const runtimeContext = new RuntimeContext();
+  
+  // Use memory if resourceId and threadId are provided
+  const options = {
+    runtimeContext,
+    ...(resourceId && threadId && { resourceId, threadId }),
+  };
+  
+  const result = await agent.stream(messages, options);
+  
+  return streamSSE(c, async (stream) => {
+    for await (const chunk of result.textStream) {
+      await stream.writeSSE({
+        data: chunk,
+      });
+    }
+  });
+});
+
+app.post("/api/workflow", async (c) => {
+  const { topic } = await c.req.json();
+  
+  if (!topic) {
+    return c.json({ error: "Topic is required" }, 400);
+  }
+  
+  try {
+    const workflow = mastra.getWorkflow("researchWorkflow");
+    const result = await workflow.execute({
+      inputData: { topic },
+    });
+    
+    return c.json(result);
+  } catch (error) {
+    console.error("Workflow error:", error);
+    return c.json({ error: "Failed to execute workflow" }, 500);
+  }
+});
+
+export default app;

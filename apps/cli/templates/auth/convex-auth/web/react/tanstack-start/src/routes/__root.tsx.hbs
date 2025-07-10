@@ -1,0 +1,53 @@
+import {
+  Outlet,
+  ScrollRestoration,
+  createRootRoute,
+} from "@tanstack/react-router";
+import { Body, Head, Html, Meta, Scripts } from "@tanstack/start";
+{{#if (includes addons "pwa")}}
+import { lazy, Suspense } from "react";
+{{/if}}
+import { Header } from "@/components/header";
+import { Providers } from "~/router";
+{{#if (includes addons "pwa")}}
+
+const PWALifeCycle = lazy(() => import("@/components/pwa-lifecycle"));
+{{/if}}
+
+export const Route = createRootRoute({
+  component: () => {
+    return (
+      <RootDocument>
+        <Outlet />
+      </RootDocument>
+    );
+  },
+});
+
+function RootDocument({ children }: { children: React.ReactNode }) {
+  return (
+    <Html>
+      <Head>
+        <Meta />
+        <style>
+          {`
+            html { height: 100%; }
+          `}
+        </style>
+      </Head>
+      <Body>
+        <Providers>
+          <Header />
+          {children}
+          {{#if (includes addons "pwa")}}
+          <Suspense>
+            <PWALifeCycle />
+          </Suspense>
+          {{/if}}
+        </Providers>
+        <ScrollRestoration />
+        <Scripts />
+      </Body>
+    </Html>
+  );
+}

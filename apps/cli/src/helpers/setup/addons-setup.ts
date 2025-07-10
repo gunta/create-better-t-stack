@@ -4,6 +4,7 @@ import fs from "fs-extra";
 import pc from "picocolors";
 import type { Frontend, ProjectConfig } from "../../types";
 import { addPackageDependency } from "../../utils/add-package-deps";
+import { setupMintlify } from "./mintlify-setup";
 import { setupStarlight } from "./starlight-setup";
 import { setupTauri } from "./tauri-setup";
 import { addPwaToViteConfig } from "./vite-pwa-setup";
@@ -40,6 +41,27 @@ ${pc.cyan("Docs:")} ${pc.underline("https://turborepo.com/docs")}
 		}
 	}
 
+	if (addons.includes("moonrepo")) {
+		await addPackageDependency({
+			devDependencies: ["@moonrepo/cli"],
+			projectDir,
+		});
+
+		if (isAddCommand) {
+			log.info(`${pc.yellow("Update your package.json scripts:")}
+
+${pc.dim("Replace:")} ${pc.yellow('"pnpm -r dev"')} ${pc.dim("→")} ${pc.green(
+				'"moon run :dev"',
+			)}
+${pc.dim("Replace:")} ${pc.yellow('"pnpm --filter web dev"')} ${pc.dim(
+				"→",
+			)} ${pc.green('"moon run web:dev"')}
+
+${pc.cyan("Docs:")} ${pc.underline("https://moonrepo.dev/docs")}
+		`);
+		}
+	}
+
 	if (addons.includes("pwa") && (hasReactWebFrontend || hasSolidFrontend)) {
 		await setupPwa(projectDir, frontend);
 	}
@@ -61,6 +83,9 @@ ${pc.cyan("Docs:")} ${pc.underline("https://turborepo.com/docs")}
 	}
 	if (addons.includes("starlight")) {
 		await setupStarlight(config);
+	}
+	if (addons.includes("mintlify")) {
+		await setupMintlify(config);
 	}
 }
 

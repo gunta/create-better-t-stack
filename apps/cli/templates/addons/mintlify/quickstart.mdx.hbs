@@ -1,0 +1,126 @@
+---
+title: 'Quickstart'
+description: 'Start building with {{projectName}} in under 5 minutes'
+---
+
+## Setup your development environment
+
+Learn how to get {{projectName}} up and running on your local machine.
+
+### Prerequisites
+
+Before you begin, make sure you have the following installed:
+
+<CardGroup cols={2}>
+  <Card title="Node.js" icon="node-js">
+    Version 18 or higher
+  </Card>
+  <Card title="Package Manager" icon="npm">
+    npm, yarn, pnpm, or bun
+  </Card>
+</CardGroup>
+
+### Installation
+
+<Steps>
+  <Step title="Clone the repository">
+    Clone the {{projectName}} repository to your local machine:
+
+    ```bash
+    git clone https://github.com/your-org/{{projectName}}.git
+    cd {{projectName}}
+    ```
+  </Step>
+  <Step title="Install dependencies">
+    Install the project dependencies using your preferred package manager:
+
+    <CodeGroup>
+      ```bash npm
+      npm install
+      ```
+
+      ```bash yarn
+      yarn install
+      ```
+
+      ```bash pnpm
+      pnpm install
+      ```
+
+      ```bash bun
+      bun install
+      ```
+    </CodeGroup>
+  </Step>
+  <Step title="Set up environment variables">
+    Copy the example environment file and update it with your values:
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    Then edit `.env` with your configuration.
+  </Step>
+  <Step title="Start the development server">
+    Run the development server:
+
+    <CodeGroup>
+      ```bash npm
+      npm run dev
+      ```
+
+      ```bash yarn
+      yarn dev
+      ```
+
+      ```bash pnpm
+      pnpm dev
+      ```
+
+      ```bash bun
+      bun dev
+      ```
+    </CodeGroup>
+
+    Your application should now be running at [http://localhost:3000](http://localhost:3000).
+  </Step>
+</Steps>
+
+## Next Steps
+
+Now that you have {{projectName}} running locally, explore these resources:
+
+<CardGroup cols={2}>
+  <Card
+    title="Project Structure"
+    icon="folder-tree"
+    href="/development"
+  >
+    Understand the project organization
+  </Card>
+  <Card
+    title="Configuration"
+    icon="gear"
+    href="/essentials/settings"
+  >
+    Learn about configuration options
+  </Card>
+  <Card
+    title="API Documentation"
+    icon="code"
+    href="/api-reference/introduction"
+  >
+    Explore the API endpoints
+  </Card>
+  <Card
+    title="Deployment"
+    icon="rocket"
+    href="/deployment"
+  >
+    Deploy to production
+  </Card>
+</CardGroup>
+
+<Note>
+  Need help? Join our [Discord community](https://discord.gg/your-invite) or check out our [GitHub discussions](https://github.com/your-org/{{projectName}}/discussions).
+</Note>

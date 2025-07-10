@@ -1,0 +1,209 @@
+import { createSignal, For, Show } from "solid-js";
+import { createStore } from "solid-js/store";
+
+type Message = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+};
+
+type ResearchResult = {
+  summary: string;
+  keyPoints: string[];
+};
+
+export default function AIAgentPage() {
+  const [messages, setMessages] = createStore<Message[]>([]);
+  const [input, setInput] = createSignal("");
+  const [isLoading, setIsLoading] = createSignal(false);
+  const [researchTopic, setResearchTopic] = createSignal("");
+  const [researchResult, setResearchResult] = createSignal<ResearchResult | null>(null);
+  const [isResearching, setIsResearching] = createSignal(false);
+  
+  const resourceId = "user_123"; // In production, get from auth
+  const threadId = `chat_${Date.now()}`;
+
+  const handleSubmit = async (e: Event) => {
+    e.preventDefault();
+    if (!input().trim() || isLoading()) return;
+
+    const userMessage: Message = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: input(),
+    };
+
+    setMessages([...messages, userMessage]);
+    setInput("");
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("/api/agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [...messages, userMessage],
+          resourceId,
+          threadId,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to get response");
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let assistantMessage: Message = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: "",
+      };
+
+      setMessages([...messages, userMessage, assistantMessage]);
+
+      while (reader) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              assistantMessage.content += data.text;
+              setMessages((msgs) => {
+                const newMsgs = [...msgs];
+                newMsgs[newMsgs.length - 1] = { ...assistantMessage };
+                return newMsgs;
+              });
+            } catch (e) {
+              // Skip invalid JSON
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Chat error:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResearch = async () => {
+    if (!researchTopic().trim()) return;
+    
+    setIsResearching(true);
+    try {
+      const response = await fetch("/api/workflow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: researchTopic() }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setResearchResult(data);
+      }
+    } catch (error) {
+      console.error("Research error:", error);
+    } finally {
+      setIsResearching(false);
+    }
+  };
+
+  return (
+    <div class="flex flex-col h-screen max-w-4xl mx-auto p-4">
+      <h1 class="text-3xl font-bold mb-4">AI Agent Assistant</h1>
+      
+      <div class="flex gap-4 mb-4">
+        <div class="flex-1 bg-gray-50 rounded-lg p-4">
+          <h2 class="text-xl font-semibold mb-2">Chat with Agent</h2>
+          <div class="flex-1 overflow-y-auto mb-4 bg-white rounded p-4 h-96">
+            <For each={messages}>
+              {(message) => (
+                <div
+                  class={`mb-4 ${
+                    message.role === "user" ? "text-right" : "text-left"
+                  }`}
+                >
+                  <div
+                    class={`inline-block p-3 rounded-lg ${
+                      message.role === "user"
+                        ? "bg-blue-500 text-white"
+                        : "bg-gray-200 text-black"
+                    }`}
+                  >
+                    <p class="text-sm font-semibold mb-1">
+                      {message.role === "user" ? "You" : "Assistant"}
+                    </p>
+                    <p>{message.content}</p>
+                  </div>
+                </div>
+              )}
+            </For>
+          </div>
+          
+          <form onSubmit={handleSubmit} class="flex gap-2">
+            <input
+              type="text"
+              value={input()}
+              onInput={(e) => setInput(e.currentTarget.value)}
+              placeholder="Ask anything..."
+              class="flex-1 p-2 border rounded"
+              disabled={isLoading()}
+            />
+            <button
+              type="submit"
+              disabled={isLoading()}
+              class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+            >
+              {isLoading() ? "Thinking..." : "Send"}
+            </button>
+          </form>
+        </div>
+        
+        <div class="flex-1 bg-gray-50 rounded-lg p-4">
+          <h2 class="text-xl font-semibold mb-2">Research Workflow</h2>
+          <div class="space-y-4">
+            <div class="flex gap-2">
+              <input
+                type="text"
+                value={researchTopic()}
+                onInput={(e) => setResearchTopic(e.currentTarget.value)}
+                placeholder="Enter a topic to research..."
+                class="flex-1 p-2 border rounded"
+                disabled={isResearching()}
+              />
+              <button
+                onClick={handleResearch}
+                disabled={isResearching() || !researchTopic().trim()}
+                class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
+              >
+                {isResearching() ? "Researching..." : "Research"}
+              </button>
+            </div>
+            
+            <Show when={researchResult()}>
+              {(result) => (
+                <div class="bg-white rounded p-4">
+                  <h3 class="font-semibold mb-2">Summary:</h3>
+                  <p class="text-gray-700 mb-4">{result().summary}</p>
+                  
+                  <h3 class="font-semibold mb-2">Key Points:</h3>
+                  <ul class="list-disc list-inside space-y-1">
+                    <For each={result().keyPoints}>
+                      {(point) => (
+                        <li class="text-gray-700">{point}</li>
+                      )}
+                    </For>
+                  </ul>
+                </div>
+              )}
+            </Show>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

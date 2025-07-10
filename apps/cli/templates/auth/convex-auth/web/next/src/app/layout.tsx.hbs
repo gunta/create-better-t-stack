@@ -1,0 +1,57 @@
+import "@/index.css";
+{{#if (includes addons "pwa")}}
+import { lazy, Suspense } from "react";
+{{/if}}
+import { Inter } from "next/font/google";
+import { Metadata, Viewport } from "next";
+import { ThemeProvider } from "@/components/theme-provider";
+import { ConvexAuthProvider } from "@/providers/ConvexAuthProvider";
+import { Header } from "@/components/header";
+{{#if (includes addons "pwa")}}
+
+const PWALifeCycle = lazy(() => import("@/components/pwa-lifecycle"));
+{{/if}}
+
+const inter = Inter({ subsets: ["latin"] });
+
+export const metadata: Metadata = {
+  title: "{{projectName}}",
+  description: "A Better T Stack app",
+  icons: [{ rel: "icon", url: "/favicon.ico" }],
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "white" },
+    { media: "(prefers-color-scheme: dark)", color: "black" },
+  ],
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body className={inter.className}>
+        <ConvexAuthProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <Header />
+            {children}
+            {{#if (includes addons "pwa")}}
+            <Suspense>
+              <PWALifeCycle />
+            </Suspense>
+            {{/if}}
+          </ThemeProvider>
+        </ConvexAuthProvider>
+      </body>
+    </html>
+  );
+}

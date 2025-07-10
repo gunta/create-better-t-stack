@@ -1,0 +1,86 @@
+import { useState } from "react";
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+import { useAuthActions } from "@convex-dev/auth/react";
+import { Link, useRouter } from "expo-router";
+
+export default function SignIn() {
+  const { signIn } = useAuthActions();
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSignIn = async () => {
+    if (!email || !password) {
+      Alert.alert("Error", "Please enter both email and password");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      await signIn("password", { email, password });
+      router.replace("/(drawer)");
+    } catch (error) {
+      Alert.alert("Error", error instanceof Error ? error.message : "Failed to sign in");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <View className="flex-1 items-center justify-center p-6 bg-background">
+      <View className="w-full max-w-sm space-y-4">
+        <Text className="text-3xl font-bold text-center text-foreground mb-8">Sign In</Text>
+        
+        <View className="space-y-2">
+          <Text className="text-sm font-medium text-muted-foreground">Email</Text>
+          <TextInput
+            className="w-full p-3 border border-input rounded-md bg-background text-foreground"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="you@example.com"
+            placeholderTextColor="#666"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            editable={!isLoading}
+          />
+        </View>
+
+        <View className="space-y-2">
+          <Text className="text-sm font-medium text-muted-foreground">Password</Text>
+          <TextInput
+            className="w-full p-3 border border-input rounded-md bg-background text-foreground"
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Enter your password"
+            placeholderTextColor="#666"
+            secureTextEntry
+            editable={!isLoading}
+          />
+        </View>
+
+        <TouchableOpacity
+          className="w-full p-3 bg-primary rounded-md items-center"
+          onPress={handleSignIn}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text className="text-primary-foreground font-medium">Sign In</Text>
+          )}
+        </TouchableOpacity>
+
+        <View className="flex-row justify-center items-center space-x-1">
+          <Text className="text-muted-foreground">Don't have an account?</Text>
+          <Link href="/sign-up" asChild>
+            <TouchableOpacity>
+              <Text className="text-primary underline">Sign up</Text>
+            </TouchableOpacity>
+          </Link>
+        </View>
+      </View>
+    </View>
+  );
+}

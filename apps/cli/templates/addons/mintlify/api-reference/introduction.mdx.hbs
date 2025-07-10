@@ -1,0 +1,166 @@
+---
+title: 'API Introduction'
+description: 'Introduction to the {{projectName}} API'
+---
+
+## Welcome to the {{projectName}} API
+
+The {{projectName}} API is organized around REST principles. It accepts JSON-encoded request bodies, returns JSON-encoded responses, and uses standard HTTP response codes, authentication, and verbs.
+
+## Base URL
+
+All API requests should be made to:
+
+```
+https://api.{{projectName}}.com/v1
+```
+
+For local development:
+
+```
+http://localhost:3001/v1
+```
+
+## Authentication
+
+The {{projectName}} API uses API keys to authenticate requests. You can view and manage your API keys in the Dashboard.
+
+Authentication to the API is performed via Bearer Auth:
+
+```bash
+curl https://api.{{projectName}}.com/v1/users \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+<Warning>
+  Keep your API keys secure! Do not share your secret API keys in publicly accessible areas such as GitHub, client-side code, and so on.
+</Warning>
+
+## Rate Limiting
+
+API requests are rate limited to ensure fair usage:
+
+- **Development**: 100 requests per minute
+- **Production**: 1000 requests per minute
+
+Rate limit information is included in response headers:
+
+```
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 999
+X-RateLimit-Reset: 1620000000
+```
+
+## Errors
+
+{{projectName}} uses conventional HTTP response codes to indicate the success or failure of an API request.
+
+| Status Code | Description |
+|------------|-------------|
+| 200 | OK - Everything worked as expected |
+| 400 | Bad Request - The request was invalid |
+| 401 | Unauthorized - Invalid authentication |
+| 403 | Forbidden - Valid authentication but insufficient permissions |
+| 404 | Not Found - The requested resource doesn't exist |
+| 429 | Too Many Requests - Rate limit exceeded |
+| 500 | Internal Server Error - Something went wrong on our end |
+
+Error responses include a JSON body with more information:
+
+```json
+{
+  "error": {
+    "code": "resource_not_found",
+    "message": "The requested user does not exist",
+    "details": {
+      "id": "user_123"
+    }
+  }
+}
+```
+
+## Pagination
+
+All list endpoints support pagination using cursor-based pagination:
+
+```bash
+GET /v1/users?limit=10&after=cursor_xyz
+```
+
+Paginated responses include metadata:
+
+```json
+{
+  "data": [...],
+  "has_more": true,
+  "next_cursor": "cursor_abc"
+}
+```
+
+## Versioning
+
+The API is versioned to ensure backwards compatibility. The current version is `v1`.
+
+When we make backwards-incompatible changes, we release new versions. The version is included in the URL path.
+
+## SDK Libraries
+
+Official SDK libraries are available for popular languages:
+
+<CardGroup cols={2}>
+  <Card title="JavaScript/TypeScript" icon="js">
+    ```bash
+    npm install @{{projectName}}/sdk
+    ```
+  </Card>
+  <Card title="Python" icon="python">
+    ```bash
+    pip install {{projectName}}-sdk
+    ```
+  </Card>
+  <Card title="Go" icon="golang">
+    ```bash
+    go get github.com/{{projectName}}/sdk-go
+    ```
+  </Card>
+  <Card title="Ruby" icon="gem">
+    ```bash
+    gem install {{projectName}}-sdk
+    ```
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+Explore the API endpoints:
+
+<CardGroup cols={2}>
+  <Card
+    title="Users"
+    icon="users"
+    href="/api-reference/endpoint/get"
+  >
+    Manage user accounts
+  </Card>
+  <Card
+    title="Projects"
+    icon="folder"
+    href="/api-reference/endpoint/create"
+  >
+    Create and manage projects
+  </Card>
+  <Card
+    title="Analytics"
+    icon="chart-line"
+    href="/api-reference/endpoint/update"
+  >
+    Access analytics data
+  </Card>
+  <Card
+    title="Webhooks"
+    icon="webhook"
+    href="/api-reference/endpoint/delete"
+  >
+    Configure webhooks
+  </Card>
+</CardGroup>

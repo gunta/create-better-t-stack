@@ -7,8 +7,9 @@ import {
 	createProjectHandler,
 } from "./helpers/project-generation/command-handlers";
 import {
-	AddonsSchema,
 	APISchema,
+	AddonsSchema,
+	AuthProviderSchema,
 	BackendSchema,
 	DatabaseSchema,
 	DatabaseSetupSchema,
@@ -45,7 +46,7 @@ const router = t.router({
 							.describe("Use default configuration"),
 						database: DatabaseSchema.optional(),
 						orm: ORMSchema.optional(),
-						auth: z.boolean().optional(),
+						auth: AuthProviderSchema.optional(),
 						frontend: z.array(FrontendSchema).optional(),
 						addons: z.array(AddonsSchema).optional(),
 						examples: z.array(ExamplesSchema).optional(),

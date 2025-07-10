@@ -1,0 +1,31 @@
+import { useAuth } from "@/lib/auth-client";
+import { Navigate } from "react-router";
+import { Loader } from "@/components/loader";
+
+export default function DashboardPage() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-4rem)]">
+        <Loader />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return (
+    <div className="container py-8">
+      <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
+      <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-6">
+        <h3 className="text-lg font-semibold mb-2">Welcome back!</h3>
+        <p className="text-muted-foreground">
+          You are signed in as {user.email}
+        </p>
+      </div>
+    </div>
+  );
+}

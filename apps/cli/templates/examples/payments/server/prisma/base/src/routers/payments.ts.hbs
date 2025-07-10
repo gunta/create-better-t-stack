@@ -1,0 +1,413 @@
+{{#if (eq api "orpc")}}
+import z from "zod";
+import { publicProcedure, protectedProcedure } from "../lib/orpc";
+import { prisma } from "../db";
+import Stripe from "stripe";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2024-12-18.acacia",
+});
+
+export const paymentsRouter = {
+  // Customer operations
+  createCustomer: protectedProcedure
+    .input(z.object({ email: z.string().email(), name: z.string().optional() }))
+    .handler(async ({ input, ctx }) => {
+      // Create Stripe customer
+      const stripeCustomer = await stripe.customers.create({
+        email: input.email,
+        name: input.name,
+        metadata: {
+          userId: ctx.user.id,
+        },
+      });
+
+      // Store in database
+      const customer = await prisma.customer.create({
+        data: {
+          userId: ctx.user.id,
+          stripeCustomerId: stripeCustomer.id,
+          email: input.email,
+          name: input.name,
+        },
+      });
+
+      return customer;
+    }),
+
+  getCustomer: protectedProcedure.handler(async ({ ctx }) => {
+    const customer = await prisma.customer.findUnique({
+      where: { userId: ctx.user.id },
+    });
+    
+    return customer;
+  }),
+
+  // Product operations
+  getProducts: publicProcedure.handler(async () => {
+    const products = await prisma.product.findMany({
+      where: { active: true },
+      include: {
+        prices: {
+          where: { active: true },
+        },
+      },
+    });
+
+    return products;
+  }),
+
+  // Checkout operations
+  createCheckoutSession: protectedProcedure
+    .input(z.object({
+      priceId: z.string(),
+      quantity: z.number().default(1),
+      mode: z.enum(["payment", "subscription"]),
+      successUrl: z.string().url(),
+      cancelUrl: z.string().url(),
+    }))
+    .handler(async ({ input, ctx }) => {
+      // Get or create customer
+      let customer = await prisma.customer.findUnique({
+        where: { userId: ctx.user.id },
+      });
+
+      if (!customer) {
+        const stripeCustomer = await stripe.customers.create({
+          email: ctx.user.email,
+          metadata: {
+            userId: ctx.user.id,
+          },
+        });
+
+        customer = await prisma.customer.create({
+          data: {
+            userId: ctx.user.id,
+            stripeCustomerId: stripeCustomer.id,
+            email: ctx.user.email,
+          },
+        });
+      }
+
+      // Get price from database
+      const price = await prisma.price.findUnique({
+        where: { id: input.priceId },
+      });
+
+      if (!price || !price.stripePriceId) {
+        throw new Error("Invalid price");
+      }
+
+      // Create checkout session
+      const session = await stripe.checkout.sessions.create({
+        customer: customer.stripeCustomerId!,
+        mode: input.mode,
+        line_items: [
+          {
+            price: price.stripePriceId,
+            quantity: input.quantity,
+          },
+        ],
+        success_url: input.successUrl,
+        cancel_url: input.cancelUrl,
+        metadata: {
+          userId: ctx.user.id,
+          priceId: price.id,
+        },
+      });
+
+      return { url: session.url };
+    }),
+
+  // Subscription operations
+  getSubscriptions: protectedProcedure.handler(async ({ ctx }) => {
+    const customer = await prisma.customer.findUnique({
+      where: { userId: ctx.user.id },
+    });
+
+    if (!customer) {
+      return [];
+    }
+
+    const subscriptions = await prisma.subscription.findMany({
+      where: { customerId: customer.id },
+      include: {
+        price: {
+          include: {
+            product: true,
+          },
+        },
+      },
+    });
+
+    return subscriptions;
+  }),
+
+  cancelSubscription: protectedProcedure
+    .input(z.object({ subscriptionId: z.string() }))
+    .handler(async ({ input, ctx }) => {
+      // Get subscription from database
+      const subscription = await prisma.subscription.findUnique({
+        where: { id: input.subscriptionId },
+        include: {
+          customer: true,
+        },
+      });
+
+      if (!subscription || !subscription.stripeSubscriptionId) {
+        throw new Error("Subscription not found");
+      }
+
+      // Verify ownership
+      if (subscription.customer.userId !== ctx.user.id) {
+        throw new Error("Unauthorized");
+      }
+
+      // Cancel in Stripe
+      const canceledSubscription = await stripe.subscriptions.update(
+        subscription.stripeSubscriptionId,
+        {
+          cancel_at_period_end: true,
+        }
+      );
+
+      // Update in database
+      await prisma.subscription.update({
+        where: { id: input.subscriptionId },
+        data: {
+          cancelAtPeriodEnd: true,
+          cancelAt: new Date(canceledSubscription.cancel_at! * 1000),
+        },
+      });
+
+      return { success: true };
+    }),
+
+  // Customer portal
+  createPortalSession: protectedProcedure
+    .input(z.object({ returnUrl: z.string().url() }))
+    .handler(async ({ input, ctx }) => {
+      const customer = await prisma.customer.findUnique({
+        where: { userId: ctx.user.id },
+      });
+
+      if (!customer || !customer.stripeCustomerId) {
+        throw new Error("No customer found");
+      }
+
+      const session = await stripe.billingPortal.sessions.create({
+        customer: customer.stripeCustomerId,
+        return_url: input.returnUrl,
+      });
+
+      return { url: session.url };
+    }),
+};
+{{/if}}
+
+{{#if (eq api "trpc")}}
+import z from "zod";
+import { router, publicProcedure, protectedProcedure } from "../lib/trpc";
+import { prisma } from "../db";
+import Stripe from "stripe";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2024-12-18.acacia",
+});
+
+export const paymentsRouter = router({
+  // Customer operations
+  createCustomer: protectedProcedure
+    .input(z.object({ email: z.string().email(), name: z.string().optional() }))
+    .mutation(async ({ input, ctx }) => {
+      // Create Stripe customer
+      const stripeCustomer = await stripe.customers.create({
+        email: input.email,
+        name: input.name,
+        metadata: {
+          userId: ctx.user.id,
+        },
+      });
+
+      // Store in database
+      const customer = await prisma.customer.create({
+        data: {
+          userId: ctx.user.id,
+          stripeCustomerId: stripeCustomer.id,
+          email: input.email,
+          name: input.name,
+        },
+      });
+
+      return customer;
+    }),
+
+  getCustomer: protectedProcedure.query(async ({ ctx }) => {
+    const customer = await prisma.customer.findUnique({
+      where: { userId: ctx.user.id },
+    });
+    
+    return customer;
+  }),
+
+  // Product operations
+  getProducts: publicProcedure.query(async () => {
+    const products = await prisma.product.findMany({
+      where: { active: true },
+      include: {
+        prices: {
+          where: { active: true },
+        },
+      },
+    });
+
+    return products;
+  }),
+
+  // Checkout operations
+  createCheckoutSession: protectedProcedure
+    .input(z.object({
+      priceId: z.string(),
+      quantity: z.number().default(1),
+      mode: z.enum(["payment", "subscription"]),
+      successUrl: z.string().url(),
+      cancelUrl: z.string().url(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      // Get or create customer
+      let customer = await prisma.customer.findUnique({
+        where: { userId: ctx.user.id },
+      });
+
+      if (!customer) {
+        const stripeCustomer = await stripe.customers.create({
+          email: ctx.user.email,
+          metadata: {
+            userId: ctx.user.id,
+          },
+        });
+
+        customer = await prisma.customer.create({
+          data: {
+            userId: ctx.user.id,
+            stripeCustomerId: stripeCustomer.id,
+            email: ctx.user.email,
+          },
+        });
+      }
+
+      // Get price from database
+      const price = await prisma.price.findUnique({
+        where: { id: input.priceId },
+      });
+
+      if (!price || !price.stripePriceId) {
+        throw new Error("Invalid price");
+      }
+
+      // Create checkout session
+      const session = await stripe.checkout.sessions.create({
+        customer: customer.stripeCustomerId!,
+        mode: input.mode,
+        line_items: [
+          {
+            price: price.stripePriceId,
+            quantity: input.quantity,
+          },
+        ],
+        success_url: input.successUrl,
+        cancel_url: input.cancelUrl,
+        metadata: {
+          userId: ctx.user.id,
+          priceId: price.id,
+        },
+      });
+
+      return { url: session.url };
+    }),
+
+  // Subscription operations
+  getSubscriptions: protectedProcedure.query(async ({ ctx }) => {
+    const customer = await prisma.customer.findUnique({
+      where: { userId: ctx.user.id },
+    });
+
+    if (!customer) {
+      return [];
+    }
+
+    const subscriptions = await prisma.subscription.findMany({
+      where: { customerId: customer.id },
+      include: {
+        price: {
+          include: {
+            product: true,
+          },
+        },
+      },
+    });
+
+    return subscriptions;
+  }),
+
+  cancelSubscription: protectedProcedure
+    .input(z.object({ subscriptionId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      // Get subscription from database
+      const subscription = await prisma.subscription.findUnique({
+        where: { id: input.subscriptionId },
+        include: {
+          customer: true,
+        },
+      });
+
+      if (!subscription || !subscription.stripeSubscriptionId) {
+        throw new Error("Subscription not found");
+      }
+
+      // Verify ownership
+      if (subscription.customer.userId !== ctx.user.id) {
+        throw new Error("Unauthorized");
+      }
+
+      // Cancel in Stripe
+      const canceledSubscription = await stripe.subscriptions.update(
+        subscription.stripeSubscriptionId,
+        {
+          cancel_at_period_end: true,
+        }
+      );
+
+      // Update in database
+      await prisma.subscription.update({
+        where: { id: input.subscriptionId },
+        data: {
+          cancelAtPeriodEnd: true,
+          cancelAt: new Date(canceledSubscription.cancel_at! * 1000),
+        },
+      });
+
+      return { success: true };
+    }),
+
+  // Customer portal
+  createPortalSession: protectedProcedure
+    .input(z.object({ returnUrl: z.string().url() }))
+    .mutation(async ({ input, ctx }) => {
+      const customer = await prisma.customer.findUnique({
+        where: { userId: ctx.user.id },
+      });
+
+      if (!customer || !customer.stripeCustomerId) {
+        throw new Error("No customer found");
+      }
+
+      const session = await stripe.billingPortal.sessions.create({
+        customer: customer.stripeCustomerId,
+        return_url: input.returnUrl,
+      });
+
+      return { url: session.url };
+    }),
+});
+{{/if}}

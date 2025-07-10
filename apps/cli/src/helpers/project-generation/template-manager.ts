@@ -359,7 +359,214 @@ export async function setupAuthTemplate(
 	projectDir: string,
 	context: ProjectConfig,
 ): Promise<void> {
-	if (context.backend === "convex" || !context.auth) return;
+	if (context.auth === "none") return;
+
+	// Handle Convex auth separately
+	if (context.backend === "convex") {
+		const backendDir = path.join(projectDir, "packages/backend");
+		const webAppDir = path.join(projectDir, "apps/web");
+		const nativeAppDir = path.join(projectDir, "apps/native");
+
+		if (context.auth === "clerk") {
+			// Set up Clerk + Convex integration
+			const convexClerkSrc = path.join(PKG_ROOT, "templates/auth/clerk/convex");
+			if (
+				(await fs.pathExists(convexClerkSrc)) &&
+				(await fs.pathExists(backendDir))
+			) {
+				await processAndCopyFiles("**/*", convexClerkSrc, backendDir, context);
+			}
+		} else if (context.auth === "convex-auth") {
+			// Set up Convex Auth
+			const convexAuthSrc = path.join(
+				PKG_ROOT,
+				"templates/auth/convex-auth/convex",
+			);
+			if (
+				(await fs.pathExists(convexAuthSrc)) &&
+				(await fs.pathExists(backendDir))
+			) {
+				await processAndCopyFiles("**/*", convexAuthSrc, backendDir, context);
+			}
+
+			// Copy provider and client components
+			const providerSrc = path.join(
+				PKG_ROOT,
+				"templates/auth/convex-auth/src/providers",
+			);
+			if (
+				(await fs.pathExists(providerSrc)) &&
+				(await fs.pathExists(webAppDir))
+			) {
+				await processAndCopyFiles(
+					"**/*",
+					providerSrc,
+					path.join(webAppDir, "src/providers"),
+					context,
+				);
+			}
+
+			// Copy web auth components based on framework
+			const hasReactWeb = context.frontend.some((f) =>
+				["tanstack-router", "react-router", "tanstack-start", "next"].includes(
+					f,
+				),
+			);
+			const hasSvelteWeb = context.frontend.includes("svelte");
+			const hasSolidWeb = context.frontend.includes("solid");
+			const hasNuxtWeb = context.frontend.includes("nuxt");
+
+			if (hasReactWeb && (await fs.pathExists(webAppDir))) {
+				// Copy base React auth components
+				const authWebBaseSrc = path.join(
+					PKG_ROOT,
+					"templates/auth/convex-auth/web/react/base",
+				);
+				if (await fs.pathExists(authWebBaseSrc)) {
+					await processAndCopyFiles("**/*", authWebBaseSrc, webAppDir, context);
+				}
+
+				// Copy React components
+				const authWebComponentsSrc = path.join(
+					PKG_ROOT,
+					"templates/auth/convex-auth/web/react/components",
+				);
+				if (await fs.pathExists(authWebComponentsSrc)) {
+					await processAndCopyFiles(
+						"**/*",
+						authWebComponentsSrc,
+						path.join(webAppDir, "src/components"),
+						context,
+					);
+				}
+
+				// Copy framework-specific files
+				const reactFramework = context.frontend.find((f) =>
+					[
+						"tanstack-router",
+						"react-router",
+						"tanstack-start",
+						"next",
+					].includes(f),
+				);
+				if (reactFramework) {
+					const authWebFrameworkSrc = path.join(
+						PKG_ROOT,
+						`templates/auth/convex-auth/web/react/${reactFramework}`,
+					);
+					if (await fs.pathExists(authWebFrameworkSrc)) {
+						await processAndCopyFiles(
+							"**/*",
+							authWebFrameworkSrc,
+							webAppDir,
+							context,
+						);
+					}
+
+					// Copy Next.js specific pages
+					if (reactFramework === "next") {
+						const authNextSrc = path.join(
+							PKG_ROOT,
+							"templates/auth/convex-auth/web/next",
+						);
+						if (await fs.pathExists(authNextSrc)) {
+							await processAndCopyFiles(
+								"**/*",
+								authNextSrc,
+								webAppDir,
+								context,
+							);
+						}
+					}
+				}
+			}
+
+			// Copy Svelte auth components
+			if (hasSvelteWeb && (await fs.pathExists(webAppDir))) {
+				const authSvelteSrc = path.join(
+					PKG_ROOT,
+					"templates/auth/convex-auth/web/svelte",
+				);
+				if (await fs.pathExists(authSvelteSrc)) {
+					await processAndCopyFiles("**/*", authSvelteSrc, webAppDir, context);
+				}
+			}
+
+			// Copy Solid auth components
+			if (hasSolidWeb && (await fs.pathExists(webAppDir))) {
+				const authSolidSrc = path.join(
+					PKG_ROOT,
+					"templates/auth/convex-auth/web/solid",
+				);
+				if (await fs.pathExists(authSolidSrc)) {
+					await processAndCopyFiles("**/*", authSolidSrc, webAppDir, context);
+				}
+			}
+
+			// Copy Nuxt auth components
+			if (hasNuxtWeb && (await fs.pathExists(webAppDir))) {
+				const authNuxtSrc = path.join(
+					PKG_ROOT,
+					"templates/auth/convex-auth/web/nuxt",
+				);
+				if (await fs.pathExists(authNuxtSrc)) {
+					await processAndCopyFiles("**/*", authNuxtSrc, webAppDir, context);
+				}
+			}
+
+			// Copy native auth components
+			const hasNativeWind = context.frontend.includes("native-nativewind");
+			const hasUnistyles = context.frontend.includes("native-unistyles");
+			const hasNative = hasNativeWind || hasUnistyles;
+
+			if (hasNative && (await fs.pathExists(nativeAppDir))) {
+				// Copy native provider
+				const nativeProviderSrc = path.join(
+					PKG_ROOT,
+					"templates/auth/convex-auth/native/providers",
+				);
+				if (await fs.pathExists(nativeProviderSrc)) {
+					await processAndCopyFiles(
+						"**/*",
+						nativeProviderSrc,
+						path.join(nativeAppDir, "providers"),
+						context,
+					);
+				}
+
+				// Copy native lib
+				const nativeLibSrc = path.join(
+					PKG_ROOT,
+					"templates/auth/convex-auth/native/lib",
+				);
+				if (await fs.pathExists(nativeLibSrc)) {
+					await processAndCopyFiles(
+						"**/*",
+						nativeLibSrc,
+						path.join(nativeAppDir, "lib"),
+						context,
+					);
+				}
+
+				// Copy framework-specific native components
+				if (hasNativeWind) {
+					const nativeWindSrc = path.join(
+						PKG_ROOT,
+						"templates/auth/convex-auth/native/nativewind",
+					);
+					if (await fs.pathExists(nativeWindSrc)) {
+						await processAndCopyFiles(
+							"**/*",
+							nativeWindSrc,
+							nativeAppDir,
+							context,
+						);
+					}
+				}
+			}
+		}
+		return;
+	}
 
 	const serverAppDir = path.join(projectDir, "apps/server");
 	const webAppDir = path.join(projectDir, "apps/web");
@@ -379,8 +586,13 @@ export async function setupAuthTemplate(
 	const hasUnistyles = context.frontend.includes("native-unistyles");
 	const hasNative = hasNativeWind || hasUnistyles;
 
+	const authProvider = context.auth === "better-auth" ? "" : `${context.auth}/`;
+
 	if (serverAppDirExists) {
-		const authServerBaseSrc = path.join(PKG_ROOT, "templates/auth/server/base");
+		const authServerBaseSrc = path.join(
+			PKG_ROOT,
+			`templates/auth/${authProvider}server/base`,
+		);
 		if (await fs.pathExists(authServerBaseSrc)) {
 			await processAndCopyFiles(
 				"**/*",
@@ -391,7 +603,7 @@ export async function setupAuthTemplate(
 		} else {
 		}
 
-		if (context.backend === "next") {
+		if (context.backend === "next" && context.auth === "better-auth") {
 			const authServerNextSrc = path.join(
 				PKG_ROOT,
 				"templates/auth/server/next",
@@ -407,7 +619,11 @@ export async function setupAuthTemplate(
 			}
 		}
 
-		if (context.orm !== "none" && context.database !== "none") {
+		if (
+			context.orm !== "none" &&
+			context.database !== "none" &&
+			context.auth === "better-auth"
+		) {
 			const orm = context.orm;
 			const db = context.database;
 			let authDbSrc = "";
@@ -441,7 +657,7 @@ export async function setupAuthTemplate(
 		if (hasReactWeb) {
 			const authWebBaseSrc = path.join(
 				PKG_ROOT,
-				"templates/auth/web/react/base",
+				`templates/auth/${authProvider}web/react/base`,
 			);
 			if (await fs.pathExists(authWebBaseSrc)) {
 				await processAndCopyFiles("**/*", authWebBaseSrc, webAppDir, context);
@@ -456,7 +672,7 @@ export async function setupAuthTemplate(
 			if (reactFramework) {
 				const authWebFrameworkSrc = path.join(
 					PKG_ROOT,
-					`templates/auth/web/react/${reactFramework}`,
+					`templates/auth/${authProvider}web/react/${reactFramework}`,
 				);
 				if (await fs.pathExists(authWebFrameworkSrc)) {
 					await processAndCopyFiles(
@@ -468,13 +684,13 @@ export async function setupAuthTemplate(
 				} else {
 				}
 			}
-		} else if (hasNuxtWeb) {
+		} else if (hasNuxtWeb && context.auth === "better-auth") {
 			const authWebNuxtSrc = path.join(PKG_ROOT, "templates/auth/web/nuxt");
 			if (await fs.pathExists(authWebNuxtSrc)) {
 				await processAndCopyFiles("**/*", authWebNuxtSrc, webAppDir, context);
 			} else {
 			}
-		} else if (hasSvelteWeb) {
+		} else if (hasSvelteWeb && context.auth === "better-auth") {
 			if (context.api === "orpc") {
 				const authWebSvelteSrc = path.join(
 					PKG_ROOT,
@@ -490,7 +706,7 @@ export async function setupAuthTemplate(
 				} else {
 				}
 			}
-		} else if (hasSolidWeb) {
+		} else if (hasSolidWeb && context.auth === "better-auth") {
 			if (context.api === "orpc") {
 				const authWebSolidSrc = path.join(PKG_ROOT, "templates/auth/web/solid");
 				if (await fs.pathExists(authWebSolidSrc)) {
@@ -507,35 +723,50 @@ export async function setupAuthTemplate(
 	}
 
 	if (hasNative && nativeAppDirExists) {
-		const authNativeBaseSrc = path.join(
-			PKG_ROOT,
-			"templates/auth/native/native-base",
-		);
-		if (await fs.pathExists(authNativeBaseSrc)) {
-			await processAndCopyFiles(
-				"**/*",
-				authNativeBaseSrc,
-				nativeAppDir,
-				context,
-			);
-		}
-
-		let nativeFrameworkAuthPath = "";
-		if (hasNativeWind) {
-			nativeFrameworkAuthPath = "nativewind";
-		} else if (hasUnistyles) {
-			nativeFrameworkAuthPath = "unistyles";
-		}
-
-		if (nativeFrameworkAuthPath) {
-			const authNativeFrameworkSrc = path.join(
+		if (context.auth === "better-auth") {
+			const authNativeBaseSrc = path.join(
 				PKG_ROOT,
-				`templates/auth/native/${nativeFrameworkAuthPath}`,
+				"templates/auth/native/native-base",
 			);
-			if (await fs.pathExists(authNativeFrameworkSrc)) {
+			if (await fs.pathExists(authNativeBaseSrc)) {
 				await processAndCopyFiles(
 					"**/*",
-					authNativeFrameworkSrc,
+					authNativeBaseSrc,
+					nativeAppDir,
+					context,
+				);
+			}
+
+			let nativeFrameworkAuthPath = "";
+			if (hasNativeWind) {
+				nativeFrameworkAuthPath = "nativewind";
+			} else if (hasUnistyles) {
+				nativeFrameworkAuthPath = "unistyles";
+			}
+
+			if (nativeFrameworkAuthPath) {
+				const authNativeFrameworkSrc = path.join(
+					PKG_ROOT,
+					`templates/auth/native/${nativeFrameworkAuthPath}`,
+				);
+				if (await fs.pathExists(authNativeFrameworkSrc)) {
+					await processAndCopyFiles(
+						"**/*",
+						authNativeFrameworkSrc,
+						nativeAppDir,
+						context,
+					);
+				}
+			}
+		} else if (context.auth === "clerk") {
+			const authNativeClerkSrc = path.join(
+				PKG_ROOT,
+				"templates/auth/clerk/native/expo",
+			);
+			if (await fs.pathExists(authNativeClerkSrc)) {
+				await processAndCopyFiles(
+					"**/*",
+					authNativeClerkSrc,
 					nativeAppDir,
 					context,
 				);

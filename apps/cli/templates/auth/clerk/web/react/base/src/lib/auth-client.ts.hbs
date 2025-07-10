@@ -1,0 +1,23 @@
+import { ClerkProvider } from "@clerk/clerk-react";
+import { dark } from "@clerk/themes";
+
+export const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+
+if (!clerkPublishableKey) {
+  throw new Error("Missing Clerk Publishable Key");
+}
+
+export { ClerkProvider };
+export { dark as clerkDarkTheme };
+
+export { 
+  useAuth,
+  useUser,
+  useClerk,
+  SignIn,
+  SignUp,
+  UserButton,
+  SignedIn,
+  SignedOut,
+  RedirectToSignIn,
+} from "@clerk/clerk-react";

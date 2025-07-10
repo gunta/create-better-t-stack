@@ -39,12 +39,22 @@ export const FrontendSchema = z
 export type Frontend = z.infer<typeof FrontendSchema>;
 
 export const AddonsSchema = z
-	.enum(["pwa", "tauri", "starlight", "biome", "husky", "turborepo", "none"])
+	.enum([
+		"pwa",
+		"tauri",
+		"starlight",
+		"mintlify",
+		"biome",
+		"husky",
+		"turborepo",
+		"moonrepo",
+		"none",
+	])
 	.describe("Additional addons");
 export type Addons = z.infer<typeof AddonsSchema>;
 
 export const ExamplesSchema = z
-	.enum(["todo", "ai", "none"])
+	.enum(["todo", "ai", "ai-agents", "payments", "none"])
 	.describe("Example templates to include");
 export type Examples = z.infer<typeof ExamplesSchema>;
 
@@ -52,6 +62,11 @@ export const PackageManagerSchema = z
 	.enum(["npm", "pnpm", "bun"])
 	.describe("Package manager");
 export type PackageManager = z.infer<typeof PackageManagerSchema>;
+
+export const AuthProviderSchema = z
+	.enum(["better-auth", "clerk", "convex-auth", "none"])
+	.describe("Authentication provider");
+export type AuthProvider = z.infer<typeof AuthProviderSchema>;
 
 export const DatabaseSetupSchema = z
 	.enum([
@@ -103,7 +118,7 @@ export type CreateInput = {
 	yes?: boolean;
 	database?: Database;
 	orm?: ORM;
-	auth?: boolean;
+	auth?: AuthProvider;
 	frontend?: Frontend[];
 	addons?: Addons[];
 	examples?: Examples[];
@@ -140,7 +155,7 @@ export interface ProjectConfig {
 	frontend: Frontend[];
 	addons: Addons[];
 	examples: Examples[];
-	auth: boolean;
+	auth: AuthProvider;
 	git: boolean;
 	packageManager: PackageManager;
 	install: boolean;
@@ -159,7 +174,7 @@ export interface BetterTStackConfig {
 	frontend: Frontend[];
 	addons: Addons[];
 	examples: Examples[];
-	auth: boolean;
+	auth: AuthProvider;
 	packageManager: PackageManager;
 	dbSetup: DatabaseSetup;
 	api: API;

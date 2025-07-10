@@ -1,0 +1,288 @@
+import { useState } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+} from "react-native";
+import { useChat } from "@ai-sdk/react";
+import { createStyleSheet, useStyles } from "react-native-unistyles";
+
+export default function AIAgentScreen() {
+  const { styles } = useStyles(stylesheet);
+  const [resourceId] = useState("user_123"); // In production, get from auth
+  const [threadId] = useState(`chat_${Date.now()}`);
+  const [researchTopic, setResearchTopic] = useState("");
+  const [researchResult, setResearchResult] = useState<{
+    summary: string;
+    keyPoints: string[];
+  } | null>(null);
+  const [isResearching, setIsResearching] = useState(false);
+
+  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
+    api: `${process.env.EXPO_PUBLIC_SERVER_URL}/api/agent`,
+    body: {
+      resourceId,
+      threadId,
+    },
+  });
+
+  const handleResearch = async () => {
+    if (!researchTopic.trim()) return;
+    
+    setIsResearching(true);
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_SERVER_URL}/api/workflow`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: researchTopic }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setResearchResult(data);
+      }
+    } catch (error) {
+      console.error("Research error:", error);
+    } finally {
+      setIsResearching(false);
+    }
+  };
+
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={styles.container}
+    >
+      <ScrollView style={styles.scrollView}>
+        <Text style={styles.title}>AI Agent Assistant</Text>
+        
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Chat with Agent</Text>
+          <View style={styles.chatContainer}>
+            <ScrollView>
+              {messages.map((message) => (
+                <View
+                  key={message.id}
+                  style={[
+                    styles.messageWrapper,
+                    message.role === "user" && styles.userMessageWrapper,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.messageBubble,
+                      message.role === "user"
+                        ? styles.userMessage
+                        : styles.assistantMessage,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.messageRole,
+                        message.role === "user" && styles.userMessageText,
+                      ]}
+                    >
+                      {message.role === "user" ? "You" : "Assistant"}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.messageContent,
+                        message.role === "user" && styles.userMessageText,
+                      ]}
+                    >
+                      {message.content}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+          
+          <View style={styles.inputRow}>
+            <TextInput
+              value={input}
+              onChangeText={(text) => handleInputChange({ target: { value: text } } as any)}
+              placeholder="Ask anything..."
+              style={styles.input}
+              editable={!isLoading}
+            />
+            <TouchableOpacity
+              onPress={handleSubmit}
+              disabled={isLoading}
+              style={[
+                styles.button,
+                isLoading && styles.buttonDisabled,
+              ]}
+            >
+              <Text style={styles.buttonText}>
+                {isLoading ? "..." : "Send"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Research Workflow</Text>
+          <View style={styles.inputRow}>
+            <TextInput
+              value={researchTopic}
+              onChangeText={setResearchTopic}
+              placeholder="Enter a topic to research..."
+              style={styles.input}
+              editable={!isResearching}
+            />
+            <TouchableOpacity
+              onPress={handleResearch}
+              disabled={isResearching || !researchTopic.trim()}
+              style={[
+                styles.button,
+                styles.researchButton,
+                (isResearching || !researchTopic.trim()) && styles.buttonDisabled,
+              ]}
+            >
+              {isResearching ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={styles.buttonText}>Research</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+          
+          {researchResult && (
+            <View style={styles.resultContainer}>
+              <Text style={styles.resultTitle}>Summary:</Text>
+              <Text style={styles.resultText}>{researchResult.summary}</Text>
+              
+              <Text style={styles.resultTitle}>Key Points:</Text>
+              {researchResult.keyPoints.map((point, index) => (
+                <Text key={index} style={styles.resultPoint}>
+                  • {point}
+                </Text>
+              ))}
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+const stylesheet = createStyleSheet((theme) => ({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  scrollView: {
+    flex: 1,
+    padding: 16,
+  },
+  title: {
+    fontSize: 30,
+    fontWeight: "bold",
+    marginBottom: 16,
+    color: theme.colors.typography,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    marginBottom: 8,
+    color: theme.colors.typography,
+  },
+  chatContainer: {
+    backgroundColor: theme.colors.gray[100],
+    borderRadius: 8,
+    padding: 16,
+    minHeight: 300,
+    maxHeight: 400,
+  },
+  messageWrapper: {
+    marginBottom: 16,
+    alignItems: "flex-start",
+  },
+  userMessageWrapper: {
+    alignItems: "flex-end",
+  },
+  messageBubble: {
+    padding: 12,
+    borderRadius: 8,
+    maxWidth: "80%",
+  },
+  userMessage: {
+    backgroundColor: theme.colors.primary,
+  },
+  assistantMessage: {
+    backgroundColor: theme.colors.gray[300],
+  },
+  messageRole: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 4,
+    color: theme.colors.typography,
+  },
+  messageContent: {
+    fontSize: 16,
+    color: theme.colors.typography,
+  },
+  userMessageText: {
+    color: "white",
+  },
+  inputRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 16,
+  },
+  input: {
+    flex: 1,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.gray[300],
+    borderRadius: 8,
+    fontSize: 16,
+    color: theme.colors.typography,
+  },
+  button: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: theme.colors.primary,
+    justifyContent: "center",
+  },
+  researchButton: {
+    backgroundColor: theme.colors.success,
+  },
+  buttonDisabled: {
+    backgroundColor: theme.colors.gray[400],
+  },
+  buttonText: {
+    color: "white",
+    fontWeight: "500",
+    fontSize: 16,
+  },
+  resultContainer: {
+    backgroundColor: theme.colors.gray[100],
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 16,
+  },
+  resultTitle: {
+    fontWeight: "600",
+    marginBottom: 8,
+    color: theme.colors.typography,
+  },
+  resultText: {
+    color: theme.colors.gray[700],
+    marginBottom: 16,
+  },
+  resultPoint: {
+    color: theme.colors.gray[700],
+    marginBottom: 4,
+  },
+}));

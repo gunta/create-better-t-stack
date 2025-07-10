@@ -1,24 +1,50 @@
-import { cancel, confirm, isCancel } from "@clack/prompts";
+import { cancel, isCancel, select } from "@clack/prompts";
 import pc from "picocolors";
 import { DEFAULT_CONFIG } from "../constants";
-import type { Backend } from "../types";
+import type { AuthProvider, Backend } from "../types";
 
 export async function getAuthChoice(
-	auth: boolean | undefined,
+	auth: AuthProvider | undefined,
 	hasDatabase: boolean,
 	backend?: Backend,
-): Promise<boolean> {
-	if (backend === "convex") {
-		return false;
-	}
-
-	if (!hasDatabase) return false;
+): Promise<AuthProvider> {
+	if (!hasDatabase && backend !== "convex") return "none";
 
 	if (auth !== undefined) return auth;
 
-	const response = await confirm({
-		message: "Add authentication with Better-Auth?",
-		initialValue: DEFAULT_CONFIG.auth,
+	const options =
+		backend === "convex"
+			? [
+					{
+						value: "convex-auth",
+						label: "Convex Auth",
+						hint: "Built-in Convex authentication",
+					},
+					{
+						value: "clerk",
+						label: "Clerk",
+						hint: "Clerk + Convex integration",
+					},
+					{ value: "none", label: "None", hint: "No authentication" },
+				]
+			: [
+					{
+						value: "better-auth",
+						label: "Better Auth",
+						hint: "Modern authentication with built-in providers",
+					},
+					{
+						value: "clerk",
+						label: "Clerk",
+						hint: "Complete user management solution",
+					},
+					{ value: "none", label: "None", hint: "No authentication" },
+				];
+
+	const response = await select({
+		message: "Choose an authentication provider:",
+		options,
+		initialValue: backend === "convex" ? "convex-auth" : DEFAULT_CONFIG.auth,
 	});
 
 	if (isCancel(response)) {
@@ -26,5 +52,5 @@ export async function getAuthChoice(
 		process.exit(0);
 	}
 
-	return response;
+	return response as AuthProvider;
 }

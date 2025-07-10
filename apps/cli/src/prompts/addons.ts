@@ -23,6 +23,9 @@ function getAddonDisplay(
 	if (addon === "turborepo") {
 		label = isRecommended ? "Turborepo (Recommended)" : "Turborepo";
 		hint = "High-performance build system for JavaScript and TypeScript";
+	} else if (addon === "moonrepo") {
+		label = isRecommended ? "Moonrepo" : "Moonrepo";
+		hint = "Modern build system and monorepo management tool";
 	} else if (addon === "pwa") {
 		label = "PWA (Progressive Web App)";
 		hint = "Make your app installable and work offline";
@@ -44,6 +47,11 @@ function getAddonDisplay(
 		hint = isRecommended
 			? "Add Astro Starlight documentation site"
 			: "Documentation site with Astro";
+	} else if (addon === "mintlify") {
+		label = "Mintlify";
+		hint = isRecommended
+			? "Add Mintlify documentation site"
+			: "Beautiful documentation with Mintlify";
 	} else {
 		label = addon;
 		hint = `Add ${addon}`;
@@ -77,8 +85,14 @@ export async function getAddonsChoice(
 	}
 
 	const options = allPossibleOptions.sort((a, b) => {
-		if (a.value === "turborepo") return -1;
-		if (b.value === "turborepo") return 1;
+		// Sort turborepo and moonrepo at the top
+		if (a.value === "turborepo" || a.value === "moonrepo") {
+			if (b.value === "turborepo" || b.value === "moonrepo") {
+				return a.value.localeCompare(b.value);
+			}
+			return -1;
+		}
+		if (b.value === "turborepo" || b.value === "moonrepo") return 1;
 		return 0;
 	});
 
@@ -100,6 +114,14 @@ export async function getAddonsChoice(
 
 	if (response.includes("husky") && !response.includes("biome")) {
 		response.push("biome");
+	}
+
+	// Ensure turborepo and moonrepo are mutually exclusive
+	if (response.includes("turborepo") && response.includes("moonrepo")) {
+		cancel(
+			pc.red("Cannot use both Turborepo and Moonrepo. Please choose one."),
+		);
+		process.exit(0);
 	}
 
 	return response;

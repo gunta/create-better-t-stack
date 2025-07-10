@@ -1,0 +1,16 @@
+import { useAuthActions } from "@convex-dev/auth/react";
+import { api } from "{{#if (eq api "trpc")}}@/utils/trpc{{else if (eq api "orpc")}}@/utils/orpc{{/if}}";
+import { useQuery } from "convex/react";
+
+export function useAuth() {
+  const { signIn, signOut } = useAuthActions();
+  const user = useQuery(api.users.viewer);
+  
+  return {
+    user,
+    signIn,
+    signOut,
+    isLoading: user === undefined,
+    isAuthenticated: user !== null,
+  };
+}

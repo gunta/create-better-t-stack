@@ -1,0 +1,179 @@
+import { NextRequest, NextResponse } from "next/server";
+import Stripe from "stripe";
+import { db } from "@/db";
+import { customers, subscriptions, invoices, paymentIntents } from "@/db/schema/payments";
+import { eq } from "drizzle-orm";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2024-12-18.acacia",
+});
+
+export async function POST(req: NextRequest) {
+  const body = await req.text();
+  const signature = req.headers.get("stripe-signature");
+
+  if (!signature) {
+    return NextResponse.json({ error: "No signature" }, { status: 400 });
+  }
+
+  let event: Stripe.Event;
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      body,
+      signature,
+      process.env.STRIPE_WEBHOOK_SECRET!
+    );
+  } catch (err) {
+    console.error("Webhook signature verification failed:", err);
+    return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+  }
+
+  try {
+    switch (event.type) {
+      case "customer.created": {
+        const stripeCustomer = event.data.object as Stripe.Customer;
+        if (stripeCustomer.metadata.userId) {
+          await db.insert(customers).values({
+            userId: stripeCustomer.metadata.userId,
+            stripeCustomerId: stripeCustomer.id,
+            email: stripeCustomer.email!,
+            name: stripeCustomer.name,
+          }).onConflictDoUpdate({
+            target: customers.userId,
+            set: {
+              stripeCustomerId: stripeCustomer.id,
+              email: stripeCustomer.email!,
+              name: stripeCustomer.name,
+            },
+          });
+        }
+        break;
+      }
+
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        
+        if (session.mode === "subscription" && session.subscription) {
+          // Handle subscription creation
+          const subscription = await stripe.subscriptions.retrieve(
+            session.subscription as string
+          );
+          
+          const [customer] = await db
+            .select()
+            .from(customers)
+            .where(eq(customers.stripeCustomerId, subscription.customer as string))
+            .limit(1);
+
+          if (customer && subscription.items.data[0]) {
+            const priceId = subscription.items.data[0].price.id;
+            // You'll need to look up the price in your database by stripePriceId
+            // For now, we'll just store the subscription
+            await db.insert(subscriptions).values({
+              customerId: customer.id,
+              stripeSubscriptionId: subscription.id,
+              status: subscription.status,
+              quantity: subscription.items.data[0].quantity || 1,
+              currentPeriodStart: new Date(subscription.current_period_start * 1000),
+              currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+            });
+          }
+        } else if (session.mode === "payment" && session.payment_intent) {
+          // Handle one-time payment
+          const paymentIntent = await stripe.paymentIntents.retrieve(
+            session.payment_intent as string
+          );
+          
+          const [customer] = await db
+            .select()
+            .from(customers)
+            .where(eq(customers.stripeCustomerId, paymentIntent.customer as string))
+            .limit(1);
+
+          if (customer) {
+            await db.insert(paymentIntents).values({
+              customerId: customer.id,
+              stripePaymentIntentId: paymentIntent.id,
+              amount: paymentIntent.amount,
+              currency: paymentIntent.currency,
+              status: paymentIntent.status,
+              description: paymentIntent.description,
+              metadata: paymentIntent.metadata,
+            });
+          }
+        }
+        break;
+      }
+
+      case "customer.subscription.updated": {
+        const subscription = event.data.object as Stripe.Subscription;
+        
+        await db
+          .update(subscriptions)
+          .set({
+            status: subscription.status,
+            cancelAtPeriodEnd: subscription.cancel_at_period_end,
+            currentPeriodStart: new Date(subscription.current_period_start * 1000),
+            currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+            cancelAt: subscription.cancel_at ? new Date(subscription.cancel_at * 1000) : null,
+            canceledAt: subscription.canceled_at ? new Date(subscription.canceled_at * 1000) : null,
+          })
+          .where(eq(subscriptions.stripeSubscriptionId, subscription.id));
+        break;
+      }
+
+      case "customer.subscription.deleted": {
+        const subscription = event.data.object as Stripe.Subscription;
+        
+        await db
+          .update(subscriptions)
+          .set({
+            status: "canceled",
+            endedAt: new Date(),
+          })
+          .where(eq(subscriptions.stripeSubscriptionId, subscription.id));
+        break;
+      }
+
+      case "invoice.created":
+      case "invoice.updated": {
+        const invoice = event.data.object as Stripe.Invoice;
+        
+        const [customer] = await db
+          .select()
+          .from(customers)
+          .where(eq(customers.stripeCustomerId, invoice.customer as string))
+          .limit(1);
+
+        if (customer) {
+          const invoiceData = {
+            customerId: customer.id,
+            stripeInvoiceId: invoice.id,
+            number: invoice.number,
+            amountPaid: invoice.amount_paid,
+            amountDue: invoice.amount_due,
+            currency: invoice.currency,
+            status: invoice.status || "open",
+            hostedInvoiceUrl: invoice.hosted_invoice_url,
+            pdfUrl: invoice.invoice_pdf,
+          };
+
+          await db.insert(invoices).values(invoiceData).onConflictDoUpdate({
+            target: invoices.stripeInvoiceId,
+            set: invoiceData,
+          });
+        }
+        break;
+      }
+
+      default:
+        console.log(`Unhandled event type: ${event.type}`);
+    }
+
+    return NextResponse.json({ received: true });
+  } catch (error) {
+    console.error("Error processing webhook:", error);
+    return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
+  }
+}

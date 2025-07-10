@@ -44,7 +44,18 @@ export async function getExamplesChoice(
 			label: "AI Chat",
 			hint: "A simple AI chat interface using AI SDK",
 		});
+		options.push({
+			value: "ai-agents" as const,
+			label: "AI Agents (Mastra)",
+			hint: "Advanced AI agents with tools, workflows, and memory using Mastra",
+		});
 	}
+
+	options.push({
+		value: "payments" as const,
+		label: "Payments (Stripe)",
+		hint: "Payment processing with subscriptions and one-time payments using Stripe",
+	});
 
 	response = await multiselect<Examples>({
 		message: "Include examples",

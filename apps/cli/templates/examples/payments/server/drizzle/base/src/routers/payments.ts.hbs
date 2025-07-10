@@ -1,0 +1,465 @@
+{{#if (eq api "orpc")}}
+import { eq } from "drizzle-orm";
+import z from "zod";
+import { db } from "../db";
+import { customers, products, prices, subscriptions, invoices, paymentIntents } from "../db/schema/payments";
+import { publicProcedure, protectedProcedure } from "../lib/orpc";
+import Stripe from "stripe";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2024-12-18.acacia",
+});
+
+export const paymentsRouter = {
+  // Customer operations
+  createCustomer: protectedProcedure
+    .input(z.object({ email: z.string().email(), name: z.string().optional() }))
+    .handler(async ({ input, ctx }) => {
+      // Create Stripe customer
+      const stripeCustomer = await stripe.customers.create({
+        email: input.email,
+        name: input.name,
+        metadata: {
+          userId: ctx.user.id,
+        },
+      });
+
+      // Store in database
+      const [customer] = await db
+        .insert(customers)
+        .values({
+          userId: ctx.user.id,
+          stripeCustomerId: stripeCustomer.id,
+          email: input.email,
+          name: input.name,
+        })
+        .returning();
+
+      return customer;
+    }),
+
+  getCustomer: protectedProcedure.handler(async ({ ctx }) => {
+    const customer = await db
+      .select()
+      .from(customers)
+      .where(eq(customers.userId, ctx.user.id))
+      .limit(1);
+    
+    return customer[0] || null;
+  }),
+
+  // Product operations
+  getProducts: publicProcedure.handler(async () => {
+    const activeProducts = await db
+      .select()
+      .from(products)
+      .where(eq(products.active, true));
+    
+    // Get prices for each product
+    const productsWithPrices = await Promise.all(
+      activeProducts.map(async (product) => {
+        const productPrices = await db
+          .select()
+          .from(prices)
+          .where(eq(prices.productId, product.id));
+        
+        return {
+          ...product,
+          prices: productPrices,
+        };
+      })
+    );
+
+    return productsWithPrices;
+  }),
+
+  // Checkout operations
+  createCheckoutSession: protectedProcedure
+    .input(z.object({
+      priceId: z.string(),
+      quantity: z.number().default(1),
+      mode: z.enum(["payment", "subscription"]),
+      successUrl: z.string().url(),
+      cancelUrl: z.string().url(),
+    }))
+    .handler(async ({ input, ctx }) => {
+      // Get or create customer
+      let customer = await db
+        .select()
+        .from(customers)
+        .where(eq(customers.userId, ctx.user.id))
+        .limit(1);
+
+      if (!customer[0]) {
+        const stripeCustomer = await stripe.customers.create({
+          email: ctx.user.email,
+          metadata: {
+            userId: ctx.user.id,
+          },
+        });
+
+        const [newCustomer] = await db
+          .insert(customers)
+          .values({
+            userId: ctx.user.id,
+            stripeCustomerId: stripeCustomer.id,
+            email: ctx.user.email,
+          })
+          .returning();
+        
+        customer = [newCustomer];
+      }
+
+      // Get price from database
+      const [price] = await db
+        .select()
+        .from(prices)
+        .where(eq(prices.id, input.priceId))
+        .limit(1);
+
+      if (!price || !price.stripePriceId) {
+        throw new Error("Invalid price");
+      }
+
+      // Create checkout session
+      const session = await stripe.checkout.sessions.create({
+        customer: customer[0].stripeCustomerId!,
+        mode: input.mode,
+        line_items: [
+          {
+            price: price.stripePriceId,
+            quantity: input.quantity,
+          },
+        ],
+        success_url: input.successUrl,
+        cancel_url: input.cancelUrl,
+        metadata: {
+          userId: ctx.user.id,
+          priceId: price.id,
+        },
+      });
+
+      return { url: session.url };
+    }),
+
+  // Subscription operations
+  getSubscriptions: protectedProcedure.handler(async ({ ctx }) => {
+    const customer = await db
+      .select()
+      .from(customers)
+      .where(eq(customers.userId, ctx.user.id))
+      .limit(1);
+
+    if (!customer[0]) {
+      return [];
+    }
+
+    const userSubscriptions = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.customerId, customer[0].id));
+
+    return userSubscriptions;
+  }),
+
+  cancelSubscription: protectedProcedure
+    .input(z.object({ subscriptionId: z.string() }))
+    .handler(async ({ input, ctx }) => {
+      // Get subscription from database
+      const [subscription] = await db
+        .select()
+        .from(subscriptions)
+        .where(eq(subscriptions.id, input.subscriptionId))
+        .limit(1);
+
+      if (!subscription || !subscription.stripeSubscriptionId) {
+        throw new Error("Subscription not found");
+      }
+
+      // Verify ownership
+      const [customer] = await db
+        .select()
+        .from(customers)
+        .where(eq(customers.id, subscription.customerId))
+        .limit(1);
+
+      if (customer.userId !== ctx.user.id) {
+        throw new Error("Unauthorized");
+      }
+
+      // Cancel in Stripe
+      const canceledSubscription = await stripe.subscriptions.update(
+        subscription.stripeSubscriptionId,
+        {
+          cancel_at_period_end: true,
+        }
+      );
+
+      // Update in database
+      await db
+        .update(subscriptions)
+        .set({
+          cancelAtPeriodEnd: true,
+          cancelAt: new Date(canceledSubscription.cancel_at! * 1000),
+        })
+        .where(eq(subscriptions.id, input.subscriptionId));
+
+      return { success: true };
+    }),
+
+  // Customer portal
+  createPortalSession: protectedProcedure
+    .input(z.object({ returnUrl: z.string().url() }))
+    .handler(async ({ input, ctx }) => {
+      const [customer] = await db
+        .select()
+        .from(customers)
+        .where(eq(customers.userId, ctx.user.id))
+        .limit(1);
+
+      if (!customer || !customer.stripeCustomerId) {
+        throw new Error("No customer found");
+      }
+
+      const session = await stripe.billingPortal.sessions.create({
+        customer: customer.stripeCustomerId,
+        return_url: input.returnUrl,
+      });
+
+      return { url: session.url };
+    }),
+};
+{{/if}}
+
+{{#if (eq api "trpc")}}
+import z from "zod";
+import { router, publicProcedure, protectedProcedure } from "../lib/trpc";
+import { customers, products, prices, subscriptions, invoices, paymentIntents } from "../db/schema/payments";
+import { eq } from "drizzle-orm";
+import { db } from "../db";
+import Stripe from "stripe";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2024-12-18.acacia",
+});
+
+export const paymentsRouter = router({
+  // Customer operations
+  createCustomer: protectedProcedure
+    .input(z.object({ email: z.string().email(), name: z.string().optional() }))
+    .mutation(async ({ input, ctx }) => {
+      // Create Stripe customer
+      const stripeCustomer = await stripe.customers.create({
+        email: input.email,
+        name: input.name,
+        metadata: {
+          userId: ctx.user.id,
+        },
+      });
+
+      // Store in database
+      const [customer] = await db
+        .insert(customers)
+        .values({
+          userId: ctx.user.id,
+          stripeCustomerId: stripeCustomer.id,
+          email: input.email,
+          name: input.name,
+        })
+        .returning();
+
+      return customer;
+    }),
+
+  getCustomer: protectedProcedure.query(async ({ ctx }) => {
+    const customer = await db
+      .select()
+      .from(customers)
+      .where(eq(customers.userId, ctx.user.id))
+      .limit(1);
+    
+    return customer[0] || null;
+  }),
+
+  // Product operations
+  getProducts: publicProcedure.query(async () => {
+    const activeProducts = await db
+      .select()
+      .from(products)
+      .where(eq(products.active, true));
+    
+    // Get prices for each product
+    const productsWithPrices = await Promise.all(
+      activeProducts.map(async (product) => {
+        const productPrices = await db
+          .select()
+          .from(prices)
+          .where(eq(prices.productId, product.id));
+        
+        return {
+          ...product,
+          prices: productPrices,
+        };
+      })
+    );
+
+    return productsWithPrices;
+  }),
+
+  // Checkout operations
+  createCheckoutSession: protectedProcedure
+    .input(z.object({
+      priceId: z.string(),
+      quantity: z.number().default(1),
+      mode: z.enum(["payment", "subscription"]),
+      successUrl: z.string().url(),
+      cancelUrl: z.string().url(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      // Get or create customer
+      let customer = await db
+        .select()
+        .from(customers)
+        .where(eq(customers.userId, ctx.user.id))
+        .limit(1);
+
+      if (!customer[0]) {
+        const stripeCustomer = await stripe.customers.create({
+          email: ctx.user.email,
+          metadata: {
+            userId: ctx.user.id,
+          },
+        });
+
+        const [newCustomer] = await db
+          .insert(customers)
+          .values({
+            userId: ctx.user.id,
+            stripeCustomerId: stripeCustomer.id,
+            email: ctx.user.email,
+          })
+          .returning();
+        
+        customer = [newCustomer];
+      }
+
+      // Get price from database
+      const [price] = await db
+        .select()
+        .from(prices)
+        .where(eq(prices.id, input.priceId))
+        .limit(1);
+
+      if (!price || !price.stripePriceId) {
+        throw new Error("Invalid price");
+      }
+
+      // Create checkout session
+      const session = await stripe.checkout.sessions.create({
+        customer: customer[0].stripeCustomerId!,
+        mode: input.mode,
+        line_items: [
+          {
+            price: price.stripePriceId,
+            quantity: input.quantity,
+          },
+        ],
+        success_url: input.successUrl,
+        cancel_url: input.cancelUrl,
+        metadata: {
+          userId: ctx.user.id,
+          priceId: price.id,
+        },
+      });
+
+      return { url: session.url };
+    }),
+
+  // Subscription operations
+  getSubscriptions: protectedProcedure.query(async ({ ctx }) => {
+    const customer = await db
+      .select()
+      .from(customers)
+      .where(eq(customers.userId, ctx.user.id))
+      .limit(1);
+
+    if (!customer[0]) {
+      return [];
+    }
+
+    const userSubscriptions = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.customerId, customer[0].id));
+
+    return userSubscriptions;
+  }),
+
+  cancelSubscription: protectedProcedure
+    .input(z.object({ subscriptionId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      // Get subscription from database
+      const [subscription] = await db
+        .select()
+        .from(subscriptions)
+        .where(eq(subscriptions.id, input.subscriptionId))
+        .limit(1);
+
+      if (!subscription || !subscription.stripeSubscriptionId) {
+        throw new Error("Subscription not found");
+      }
+
+      // Verify ownership
+      const [customer] = await db
+        .select()
+        .from(customers)
+        .where(eq(customers.id, subscription.customerId))
+        .limit(1);
+
+      if (customer.userId !== ctx.user.id) {
+        throw new Error("Unauthorized");
+      }
+
+      // Cancel in Stripe
+      const canceledSubscription = await stripe.subscriptions.update(
+        subscription.stripeSubscriptionId,
+        {
+          cancel_at_period_end: true,
+        }
+      );
+
+      // Update in database
+      await db
+        .update(subscriptions)
+        .set({
+          cancelAtPeriodEnd: true,
+          cancelAt: new Date(canceledSubscription.cancel_at! * 1000),
+        })
+        .where(eq(subscriptions.id, input.subscriptionId));
+
+      return { success: true };
+    }),
+
+  // Customer portal
+  createPortalSession: protectedProcedure
+    .input(z.object({ returnUrl: z.string().url() }))
+    .mutation(async ({ input, ctx }) => {
+      const [customer] = await db
+        .select()
+        .from(customers)
+        .where(eq(customers.userId, ctx.user.id))
+        .limit(1);
+
+      if (!customer || !customer.stripeCustomerId) {
+        throw new Error("No customer found");
+      }
+
+      const session = await stripe.billingPortal.sessions.create({
+        customer: customer.stripeCustomerId,
+        return_url: input.returnUrl,
+      });
+
+      return { url: session.url };
+    }),
+});
+{{/if}}

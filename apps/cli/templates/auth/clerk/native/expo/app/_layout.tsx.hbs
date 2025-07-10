@@ -1,0 +1,44 @@
+import { ClerkProvider, tokenCache, publishableKey } from "@/lib/auth-client";
+import { Slot, useRouter, useSegments } from "expo-router";
+import { useEffect } from "react";
+import { useAuth } from "@clerk/clerk-expo";
+{{#if (includes frontend "native-nativewind")}}
+import "../global.css";
+{{/if}}
+{{#if (includes frontend "native-unistyles")}}
+import { UnistylesRegistry } from "react-native-unistyles";
+import { lightTheme, darkTheme } from "../styles/theme";
+
+UnistylesRegistry.addThemes({
+  light: lightTheme,
+  dark: darkTheme,
+});
+{{/if}}
+
+const InitialLayout = () => {
+  const { isLoaded, isSignedIn } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    const inTabsGroup = segments[0] === "(drawer)";
+
+    if (isSignedIn && !inTabsGroup) {
+      router.replace("/(drawer)/");
+    } else if (!isSignedIn) {
+      router.replace("/login");
+    }
+  }, [isSignedIn]);
+
+  return <Slot />;
+};
+
+export default function RootLayout() {
+  return (
+    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+      <InitialLayout />
+    </ClerkProvider>
+  );
+}

@@ -1,0 +1,161 @@
+---
+title: 'Development'
+description: 'Learn how to develop with {{projectName}}'
+---
+
+## Project Structure
+
+Understanding the project structure will help you navigate and contribute effectively.
+
+```
+{{projectName}}/
+├── apps/
+│   ├── web/          # Frontend application
+│   └── api/          # Backend API
+├── packages/
+│   ├── ui/           # Shared UI components
+│   ├── config/       # Shared configuration
+│   └── database/     # Database schemas and utilities
+├── docs/             # Documentation (you are here!)
+└── package.json      # Root package configuration
+```
+
+## Development Workflow
+
+### Running the Development Server
+
+To start developing, run the following command from the root directory:
+
+<CodeGroup>
+  ```bash npm
+  npm run dev
+  ```
+
+  ```bash yarn
+  yarn dev
+  ```
+
+  ```bash pnpm
+  pnpm dev
+  ```
+
+  ```bash bun
+  bun dev
+  ```
+</CodeGroup>
+
+This will start:
+- Frontend development server on `http://localhost:3000`
+- Backend API server on `http://localhost:3001`
+- Documentation server on `http://localhost:3002`
+
+### Making Changes
+
+<Steps>
+  <Step title="Create a feature branch">
+    ```bash
+    git checkout -b feature/your-feature-name
+    ```
+  </Step>
+  <Step title="Make your changes">
+    Edit the relevant files in the codebase. The development server will automatically reload when you save changes.
+  </Step>
+  <Step title="Test your changes">
+    Run the test suite to ensure your changes don't break existing functionality:
+    
+    ```bash
+    npm run test
+    ```
+  </Step>
+  <Step title="Lint and format">
+    Ensure your code follows the project standards:
+    
+    ```bash
+    npm run lint
+    npm run format
+    ```
+  </Step>
+</Steps>
+
+## Common Tasks
+
+### Adding a New Page
+
+To add a new page to the web application:
+
+1. Create a new file in `apps/web/src/pages/`
+2. Define your page component
+3. Add routing configuration if needed
+
+### Creating API Endpoints
+
+To add a new API endpoint:
+
+1. Create a new route file in `apps/api/src/routes/`
+2. Define your endpoint logic
+3. Add appropriate middleware and validation
+
+### Working with the Database
+
+Database operations should be performed through the shared database package:
+
+```typescript
+import { db } from '@{{projectName}}/database';
+
+// Example query
+const users = await db.user.findMany();
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Code Style">
+    - Use TypeScript for type safety
+    - Follow the ESLint configuration
+    - Use meaningful variable and function names
+    - Write self-documenting code
+  </Accordion>
+  <Accordion title="Commits">
+    - Write clear, concise commit messages
+    - Use conventional commits format
+    - Reference issues in commit messages
+  </Accordion>
+  <Accordion title="Testing">
+    - Write tests for new features
+    - Maintain existing test coverage
+    - Test edge cases and error scenarios
+  </Accordion>
+</AccordionGroup>
+
+## Debugging
+
+### Frontend Debugging
+
+Use browser DevTools and React Developer Tools for debugging the frontend:
+
+1. Open Chrome DevTools (F12)
+2. Use the Console for logging
+3. Use the Network tab for API requests
+4. Use React DevTools for component inspection
+
+### Backend Debugging
+
+For backend debugging:
+
+1. Use `console.log` statements
+2. Use the debugger with VS Code
+3. Check server logs
+4. Use API testing tools like Postman or Insomnia
+
+<Warning>
+  Always remove debugging code before committing!
+</Warning>
+
+## Getting Help
+
+If you run into issues:
+
+1. Check the [FAQ](/faq) for common problems
+2. Search existing [GitHub issues](https://github.com/your-org/{{projectName}}/issues)
+3. Ask in our [Discord community](https://discord.gg/your-invite)
+4. Create a new issue with a minimal reproduction

@@ -15,8 +15,8 @@ import pc from "picocolors";
 import type { ProjectConfig } from "../../types";
 import { commandExists } from "../../utils/command-exists";
 import {
-	addEnvVariablesToFile,
 	type EnvVariable,
+	addEnvVariablesToFile,
 } from "../project-generation/env-setup";
 
 type TursoConfig = {

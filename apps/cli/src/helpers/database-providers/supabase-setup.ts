@@ -7,8 +7,8 @@ import pc from "picocolors";
 import type { PackageManager, ProjectConfig } from "../../types";
 import { getPackageExecutionCommand } from "../../utils/package-runner";
 import {
-	addEnvVariablesToFile,
 	type EnvVariable,
+	addEnvVariablesToFile,
 } from "../project-generation/env-setup";
 
 async function writeSupabaseEnvFile(

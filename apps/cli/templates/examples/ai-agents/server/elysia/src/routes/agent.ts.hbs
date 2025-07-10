@@ -1,0 +1,59 @@
+import { Elysia } from "elysia";
+import { mastra } from "../mastra";
+import { RuntimeContext } from "@mastra/core/di";
+
+export const agentRoutes = new Elysia({ prefix: "/api" })
+  .post("/agent", async ({ body, set }) => {
+    const { messages, resourceId, threadId } = body as any;
+    
+    const agent = mastra.getAgent("assistantAgent");
+    
+    // Set up runtime context if needed
+    const runtimeContext = new RuntimeContext();
+    
+    // Use memory if resourceId and threadId are provided
+    const options = {
+      runtimeContext,
+      ...(resourceId && threadId && { resourceId, threadId }),
+    };
+    
+    const result = await agent.stream(messages, options);
+    
+    set.headers["content-type"] = "text/event-stream";
+    set.headers["cache-control"] = "no-cache";
+    set.headers["connection"] = "keep-alive";
+    
+    const stream = new ReadableStream({
+      async start(controller) {
+        for await (const chunk of result.textStream) {
+          controller.enqueue(
+            new TextEncoder().encode(`data: ${JSON.stringify({ text: chunk })}\n\n`)
+          );
+        }
+        controller.close();
+      },
+    });
+    
+    return new Response(stream);
+  })
+  .post("/workflow", async ({ body, set }) => {
+    const { topic } = body as any;
+    
+    if (!topic) {
+      set.status = 400;
+      return { error: "Topic is required" };
+    }
+    
+    try {
+      const workflow = mastra.getWorkflow("researchWorkflow");
+      const result = await workflow.execute({
+        inputData: { topic },
+      });
+      
+      return result;
+    } catch (error) {
+      console.error("Workflow error:", error);
+      set.status = 500;
+      return { error: "Failed to execute workflow" };
+    }
+  });

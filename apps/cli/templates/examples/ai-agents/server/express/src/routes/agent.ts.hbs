@@ -1,0 +1,56 @@
+import { Router } from "express";
+import { mastra } from "../mastra";
+import { RuntimeContext } from "@mastra/core/di";
+
+const router = Router();
+
+router.post("/api/agent", async (req, res) => {
+  const { messages, resourceId, threadId } = req.body;
+  
+  const agent = mastra.getAgent("assistantAgent");
+  
+  // Set up runtime context if needed
+  const runtimeContext = new RuntimeContext();
+  
+  // Use memory if resourceId and threadId are provided
+  const options = {
+    runtimeContext,
+    ...(resourceId && threadId && { resourceId, threadId }),
+  };
+  
+  const result = await agent.stream(messages, options);
+  
+  // Set up SSE headers
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  
+  // Stream the response
+  for await (const chunk of result.textStream) {
+    res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+  }
+  
+  res.end();
+});
+
+router.post("/api/workflow", async (req, res) => {
+  const { topic } = req.body;
+  
+  if (!topic) {
+    return res.status(400).json({ error: "Topic is required" });
+  }
+  
+  try {
+    const workflow = mastra.getWorkflow("researchWorkflow");
+    const result = await workflow.execute({
+      inputData: { topic },
+    });
+    
+    return res.json(result);
+  } catch (error) {
+    console.error("Workflow error:", error);
+    return res.status(500).json({ error: "Failed to execute workflow" });
+  }
+});
+
+export default router;

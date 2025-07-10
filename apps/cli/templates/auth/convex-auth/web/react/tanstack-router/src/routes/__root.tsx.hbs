@@ -1,0 +1,23 @@
+import { createRootRoute, Outlet } from "@tanstack/react-router";
+{{#if (includes addons "pwa")}}
+import { lazy, Suspense } from "react";
+{{/if}}
+import { Header } from "@/components/header";
+{{#if (includes addons "pwa")}}
+
+const PWALifeCycle = lazy(() => import("@/components/pwa-lifecycle"));
+{{/if}}
+
+export const Route = createRootRoute({
+  component: () => (
+    <>
+      <Header />
+      <Outlet />
+      {{#if (includes addons "pwa")}}
+      <Suspense>
+        <PWALifeCycle />
+      </Suspense>
+      {{/if}}
+    </>
+  ),
+});

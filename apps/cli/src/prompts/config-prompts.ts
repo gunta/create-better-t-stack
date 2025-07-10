@@ -1,8 +1,9 @@
 import { cancel, group } from "@clack/prompts";
 import pc from "picocolors";
 import type {
-	Addons,
 	API,
+	Addons,
+	AuthProvider,
 	Backend,
 	Database,
 	DatabaseSetup,
@@ -36,7 +37,7 @@ type PromptGroupResults = {
 	database: Database;
 	orm: ORM;
 	api: API;
-	auth: boolean;
+	auth: AuthProvider;
 	addons: Addons[];
 	examples: Examples[];
 	dbSetup: DatabaseSetup;
@@ -114,7 +115,9 @@ export async function gatherConfig(
 		result.database = "none";
 		result.orm = "none";
 		result.api = "none";
-		result.auth = false;
+		if (result.auth !== "convex-auth" && result.auth !== "clerk") {
+			result.auth = "none";
+		}
 		result.dbSetup = "none";
 		result.examples = ["todo"];
 		result.webDeploy = "none";
@@ -125,7 +128,7 @@ export async function gatherConfig(
 		result.database = "none";
 		result.orm = "none";
 		result.api = "none";
-		result.auth = false;
+		result.auth = "none";
 		result.dbSetup = "none";
 		result.examples = [];
 		result.webDeploy = "none";

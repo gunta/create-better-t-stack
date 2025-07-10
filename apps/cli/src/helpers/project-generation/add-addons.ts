@@ -48,7 +48,7 @@ export async function addAddonsToProject(
 			frontend: detectedConfig.frontend || [],
 			addons: input.addons,
 			examples: detectedConfig.examples || [],
-			auth: detectedConfig.auth || false,
+			auth: detectedConfig.auth || "none",
 			git: false,
 			packageManager:
 				input.packageManager || detectedConfig.packageManager || "npm",
@@ -69,6 +69,25 @@ export async function addAddonsToProject(
 						`${addon} addon is not compatible with current frontend configuration`,
 				);
 			}
+		}
+
+		// Check for turborepo/moonrepo conflicts
+		const existingAddons = detectedConfig.addons || [];
+		if (
+			input.addons.includes("turborepo") &&
+			existingAddons.includes("moonrepo")
+		) {
+			exitWithError(
+				"Cannot add Turborepo when Moonrepo is already installed. Please choose one build system.",
+			);
+		}
+		if (
+			input.addons.includes("moonrepo") &&
+			existingAddons.includes("turborepo")
+		) {
+			exitWithError(
+				"Cannot add Moonrepo when Turborepo is already installed. Please choose one build system.",
+			);
 		}
 
 		log.info(

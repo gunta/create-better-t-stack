@@ -1,0 +1,20 @@
+import { SignUp } from "@clerk/clerk-react";
+
+export function SignUpForm() {
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <SignUp
+        path="/signup"
+        routing="path"
+        signInUrl="/login"
+        appearance={{
+          elements: {
+            formButtonPrimary: 
+              "bg-primary text-primary-foreground hover:bg-primary/90",
+            card: "shadow-none",
+          },
+        }}
+      />
+    </div>
+  );
+}

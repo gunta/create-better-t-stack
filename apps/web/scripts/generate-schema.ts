@@ -1,8 +1,8 @@
 import path from "node:path";
 import fs from "fs-extra";
 import {
-	AddonsSchema,
 	APISchema,
+	AddonsSchema,
 	BackendSchema,
 	DatabaseSchema,
 	DatabaseSetupSchema,

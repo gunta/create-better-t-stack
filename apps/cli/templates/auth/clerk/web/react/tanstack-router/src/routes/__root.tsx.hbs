@@ -1,0 +1,22 @@
+import { createRootRoute, Outlet } from "@tanstack/react-router";
+import { TanStackRouterDevtools } from "@tanstack/router-devtools";
+import { UserButton } from "@clerk/clerk-react";
+
+export const Route = createRootRoute({
+  component: () => (
+    <>
+      <div className="min-h-screen">
+        <header className="border-b">
+          <div className="container mx-auto flex items-center justify-between p-4">
+            <h1 className="text-xl font-semibold">{{projectName}}</h1>
+            <UserButton afterSignOutUrl="/" />
+          </div>
+        </header>
+        <main>
+          <Outlet />
+        </main>
+      </div>
+      <TanStackRouterDevtools />
+    </>
+  ),
+});

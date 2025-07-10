@@ -135,6 +135,13 @@ export async function setupEnvironmentVariables(
 					value: serverUrl,
 					condition: true,
 				},
+				{
+					key: hasNextJs
+						? "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
+						: "VITE_CLERK_PUBLISHABLE_KEY",
+					value: "",
+					condition: auth === "clerk",
+				},
 			];
 			await addEnvVariablesToFile(path.join(clientDir, ".env"), clientVars);
 		}
@@ -159,6 +166,11 @@ export async function setupEnvironmentVariables(
 					key: envVarName,
 					value: serverUrl,
 					condition: true,
+				},
+				{
+					key: "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY",
+					value: "",
+					condition: auth === "clerk",
 				},
 			];
 			await addEnvVariablesToFile(path.join(nativeDir, ".env"), nativeVars);
@@ -220,12 +232,27 @@ export async function setupEnvironmentVariables(
 		{
 			key: "BETTER_AUTH_SECRET",
 			value: generateAuthSecret(),
-			condition: !!auth,
+			condition: auth === "better-auth",
 		},
 		{
 			key: "BETTER_AUTH_URL",
 			value: "http://localhost:3000",
-			condition: !!auth,
+			condition: auth === "better-auth",
+		},
+		{
+			key: "CLERK_SECRET_KEY",
+			value: "",
+			condition: auth === "clerk",
+		},
+		{
+			key: "CLERK_PUBLISHABLE_KEY",
+			value: "",
+			condition: auth === "clerk",
+		},
+		{
+			key: "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+			value: "",
+			condition: auth === "clerk" && frontend.includes("next"),
 		},
 		{
 			key: "DATABASE_URL",

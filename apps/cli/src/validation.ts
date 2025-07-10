@@ -2,8 +2,8 @@ import path from "node:path";
 import { consola } from "consola";
 import { WEB_FRAMEWORKS } from "./constants";
 import {
-	type Addons,
 	type API,
+	type Addons,
 	type Backend,
 	type CLIInput,
 	type Database,
@@ -181,8 +181,13 @@ export function processAndValidateFlags(
 	if (config.backend === "convex") {
 		const incompatibleFlags: string[] = [];
 
-		if (providedFlags.has("auth") && options.auth === true)
-			incompatibleFlags.push("--auth");
+		if (
+			providedFlags.has("auth") &&
+			options.auth !== "none" &&
+			options.auth !== "convex-auth" &&
+			options.auth !== "clerk"
+		)
+			incompatibleFlags.push(`--auth ${options.auth}`);
 		if (providedFlags.has("database") && options.database !== "none")
 			incompatibleFlags.push(`--database ${options.database}`);
 		if (providedFlags.has("orm") && options.orm !== "none")
@@ -217,7 +222,12 @@ export function processAndValidateFlags(
 			}
 		}
 
-		config.auth = false;
+		if (
+			!config.auth ||
+			(config.auth !== "convex-auth" && config.auth !== "clerk")
+		) {
+			config.auth = "none";
+		}
 		config.database = "none";
 		config.orm = "none";
 		config.api = "none";
@@ -227,8 +237,8 @@ export function processAndValidateFlags(
 	} else if (config.backend === "none") {
 		const incompatibleFlags: string[] = [];
 
-		if (providedFlags.has("auth") && options.auth === true)
-			incompatibleFlags.push("--auth");
+		if (providedFlags.has("auth") && options.auth !== "none")
+			incompatibleFlags.push(`--auth ${options.auth}`);
 		if (providedFlags.has("database") && options.database !== "none")
 			incompatibleFlags.push(`--database ${options.database}`);
 		if (providedFlags.has("orm") && options.orm !== "none")
@@ -255,7 +265,7 @@ export function processAndValidateFlags(
 			process.exit(1);
 		}
 
-		config.auth = false;
+		config.auth = "none";
 		config.database = "none";
 		config.orm = "none";
 		config.api = "none";
@@ -304,9 +314,9 @@ export function processAndValidateFlags(
 		process.exit(1);
 	}
 
-	if (config.auth && config.database === "none") {
+	if (config.auth && config.auth !== "none" && config.database === "none") {
 		consola.fatal(
-			"Authentication requires a database. Please choose a database or set '--no-auth'.",
+			"Authentication requires a database. Please choose a database or set '--auth none'.",
 		);
 		process.exit(1);
 	}
@@ -612,6 +622,18 @@ export function validateConfigCompatibility(
 				"Husky addon is recommended to be used with Biome for lint-staged configuration.",
 			);
 		}
+
+		// Ensure turborepo and moonrepo are mutually exclusive
+		if (
+			config.addons.includes("turborepo") &&
+			config.addons.includes("moonrepo")
+		) {
+			consola.fatal(
+				"Cannot use both Turborepo and Moonrepo. Please choose one or the other.",
+			);
+			process.exit(1);
+		}
+
 		config.addons = [...new Set(config.addons)];
 	}
 
